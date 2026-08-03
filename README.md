@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://img.icons8.com/color/96/000000/security-checked.png" alt="Logo">
   <h1>ESP32 RFID Anti-Wall-Jumping System (Student Version)</h1>
-  <p><b>Advanced multi-sensor security solution for perimeter protection</b></p>
+  <p><b>A fun, multi-sensor security project for learning hardware integration!</b></p>
 
   [![PlatformIO](https://img.shields.io/badge/PlatformIO-orange?style=for-the-badge&logo=platformio&logoColor=white)](https://platformio.org/)
   [![ESP32](https://img.shields.io/badge/ESP32-blue?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/)
@@ -13,20 +13,20 @@
 
 ## 📌 Overview
 
-The **ESP32 RFID Anti-Wall-Jumping System** is a robust, real-time perimeter security prototype designed to detect unauthorized access (like wall climbing or jumping) and respond instantly. It leverages an Active IR Beam for detection, a long-range UHF RFID reader for authorized access, a DFPlayer Mini for audio alarms, and a SIM800L module for instant SMS notifications to security personnel.
+The **ESP32 RFID Anti-Wall-Jumping System** is a cool, real-time security project designed to detect when someone tries to climb over a wall and respond instantly! It uses an Infrared (IR) Beam to detect movement, a long-range UHF RFID reader to recognize authorized student IDs, a DFPlayer Mini to play voice alarms, and a SIM800L module to send text messages (SMS) to security personnel.
 
-This **Student Version** of the repository contains the core logic (`system_firmware.cpp`) fully commented to help you understand the concurrent hardware integrations, FreeRTOS tasks, and AT-command parsing.
+This **Student Version** of the repository contains the core code (`system_firmware.cpp`) fully commented to help you learn how to connect different hardware parts together, run multiple tasks at the same time using FreeRTOS, and communicate with cellular modules!
 
 ---
 
-## ✨ Key Features
+## ✨ What You Will Learn
 
-- **🛡️ Perimeter Detection**: Uses a Dual Beam Active IR Sensor for extreme weather-resistant and long-range intrusion detection.
-- **📱 Instant SMS Alerts**: Uses SIM800L to send immediate notifications to a registered emergency contact upon intrusion.
-- **🔊 Audio Alarms**: Integrates DFPlayer Mini to broadcast custom localized voice alarms or sirens.
-- **🪪 Long Range RFID (UHF WG26)**: Allows authorized personnel with UHF tags to bypass the system from up to 20 meters away.
-- **💾 Local SD Card Logging**: All events and access attempts are saved to an onboard MicroSD card in FAT32 format.
-- **🕒 Real-Time Clock**: Built-in DS3231 RTC for accurate time-stamping of intrusion logs.
+- **🛡️ Intrusion Detection**: How to use an Active IR Sensor to create an invisible tripwire that detects when someone crosses a boundary.
+- **📱 Sending Text Messages**: How to use a SIM800L module to send automatic SMS alerts to a phone number.
+- **🔊 Playing Audio**: How to control a DFPlayer Mini to play custom MP3 voice alarms from an SD card.
+- **🪪 Long Range RFID**: How to read UHF RFID tags from a distance (like toll booths or ID badges) using the Wiegand protocol.
+- **💾 Saving Data**: How to save event logs and data onto a MicroSD card.
+- **🕒 Keeping Time**: How to use a DS3231 Real-Time Clock (RTC) so your project always knows the exact date and time.
 
 ---
 
@@ -121,7 +121,9 @@ Practical instructions for setup and usage including:
 
 ## 🚀 How to Study This Code
 
-The provided `system_firmware.cpp` file contains the complete top-level orchestration of the hardware peripherals. You can open `system_firmware.pdf` for a formatted reading experience or open the `.cpp` file in any text editor. Look at how FreeRTOS separates the sensor polling (`sensorTask`) from the SMS dispatching (`commTask`) so that the ESP32 never misses a tripped alarm while waiting for an SMS to send!
+The provided `system_firmware.cpp` file contains the complete code that makes all these hardware parts talk to the ESP32 microcontroller. You can open `system_firmware.pdf` for an easy-to-read, formatted version, or open the `.cpp` file in any text editor. 
+
+**Pro Tip:** Pay special attention to how the code uses `FreeRTOS` to separate the sensor checking (`sensorTask`) from the SMS sending (`commTask`). This allows the ESP32 to do two things at once—so it never misses a tripped alarm even while it's waiting for a text message to send!
 
 <div align="center">
   <i>Developed using C++ and PlatformIO.</i>
