@@ -106,16 +106,75 @@ All peripherals are assigned to specific GPIO pins to eliminate bus collisions (
 
 ---
 
-## 📖 Documentation & Guides
+## 🚀 Installation for Actual Testing
 
-Please refer to the comprehensive manual for detailed instructions on setting up and using the system:
+When you are ready to test the system in a real environment (like a school courtyard or field), follow these steps carefully:
+
+### Step 1: Align the Active IR Beam
+The IR Beam has two parts: a **Transmitter (T)** and a **Receiver (R)**. 
+1. Mount them on opposite sides of the wall/boundary you want to protect. 
+2. Ensure they are perfectly aligned facing each other. (Most beam sensors have a small alignment LED inside that lights up when they are correctly pointed at each other).
+3. Connect the signal wire from the Receiver to **GPIO 14** on the ESP32.
+
+### Step 2: Mount the UHF RFID Panel
+1. Mount the large white RD906M panel near the entrance of the boundary.
+2. Angle the panel so it faces the direction people will be walking from.
+3. Ensure it is firmly powered by the 12V battery and connect the Wiegand Data pins to **GPIO 21 (D0)** and **GPIO 22 (D1)**.
+
+### Step 3: Insert the SIM Card & SD Card
+1. Insert an active, unlocked Micro-SIM card into the SIM800L module. 
+2. Insert a FAT32-formatted MicroSD card into the SD Card Module.
+3. Insert your MicroSD card (with `.mp3` files) into the DFPlayer Mini.
+
+### Step 4: Power Up
+1. Connect your 12V battery.
+2. The power converters will step the 12V down to 5V and 3.3V to safely power the ESP32 and modules.
+3. Wait about 30 seconds for the SIM800L to connect to the cellular network (the blinking LED on the SIM module will slow down to once every 3 seconds when connected).
+
+---
+
+## 🎮 Standard Operations
+
+Once the system is powered on and running `system_firmware.cpp`, it operates autonomously.
+
+1. **Intrusion Event (Unauthorized Access)**: 
+   - A person breaks the IR beam.
+   - The DFPlayer instantly plays the alarm sound.
+   - The SIM800L queues and sends an SMS alert to the registered security number.
+   - The event is written to the SD Card.
+
+2. **Safe Passage Event (Authorized Access)**:
+   - A person with an authorized UHF RFID tag approaches the panel.
+   - The system registers the ID and flashes the Status LED.
+   - The person walks through the IR Beam. 
+   - The alarm **does NOT** trigger. The system logs a safe passage event.
+
+---
+
+## 🔧 Troubleshooting & Repair
+
+If the system isn't acting as expected, consult this troubleshooting matrix before replacing components:
+
+| Symptom | Probable Cause | Corrective Action |
+| :--- | :--- | :--- |
+| **System fails to send SMS** | SIM800L is underpowered or has no signal. | Check if the SIM800L LED is blinking fast (no signal) or slow (connected). Ensure the 5V power converter is outputting at least 2 Amps. Check SIM card balance. |
+| **Alarm triggers randomly** | IR Beam misalignment or sunlight interference. | Realignment required. Ensure the receiver lens is shielded from direct, blinding sunlight. Check for wind blowing debris through the beam. |
+| **No audio / DFPlayer silent** | SD card format issue or bad wiring. | Ensure SD card is FAT32 format. Audio files must be named `001.mp3`, `002.mp3`, etc. Check the 1k resistor on the TX line. |
+| **RFID tags not reading** | Bad Wiegand connection or insufficient voltage. | The RD906M requires full 12V power. Check the D0 (GPIO 21) and D1 (GPIO 22) connections. |
+| **SD Card fails to initialize** | SPI bus collision or loose jumper wire. | Check the CS pin on GPIO 5. Ensure the SD module receives full 5V (if it has a regulator) or 3.3V. |
+
+### Component Replacement (Repair)
+- If a sensor must be replaced, always **disconnect the 12V battery first**.
+- **ESP32 Board**: If replacing the main board, you must re-flash `system_firmware.cpp` using PlatformIO before operation.
+- **SIM800L Module**: Always swap the SIM card into the new module while the system is powered off to prevent shorting the SIM contacts.
+
+---
+
+## 📖 Official PDF Manual
+
+You can also view all of these instructions (with extra setup configuration details) in our official formatted student guide:
 
 ### 👤 [Download the Complete System Manual (PDF)](./System_Manual.pdf)
-Practical instructions for setup and usage including:
-- Complete Pin Mapping Reference
-- Operating Modes (Normal vs Config Mode)
-- RFID Registration & Incident Tracking
-- Setup for the DFPlayer SD Card (Audio Tracks)
 
 ---
 
