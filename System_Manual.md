@@ -1,12 +1,3 @@
-<style>
-  @media print {
-    h1, h2, h3, h4, h5, h6 { page-break-after: avoid !important; page-break-inside: avoid !important; }
-    table, img, pre { page-break-inside: avoid !important; }
-    p, li { orphans: 3; widows: 3; }
-    .page-break { page-break-before: always !important; }
-  }
-</style>
-
 # ESP32 RFID Anti-Wall-Jumping System
 **Advanced multi-sensor security solution for perimeter protection**
 
