@@ -1,11 +1,3 @@
-<style>
-  @media print {
-    h1, h2, h3, h4, h5, h6 { page-break-after: avoid !important; }
-    table, img, pre { page-break-inside: avoid !important; }
-    p, li { orphans: 3; widows: 3; }
-  }
-</style>
-
 <div align="center">
   <img src="https://img.icons8.com/color/96/000000/security-checked.png" alt="Logo">
   <h1>ESP32 RFID Anti-Wall-Jumping System (Student Version)</h1>
