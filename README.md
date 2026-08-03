@@ -182,7 +182,7 @@ If the system isn't acting as expected, consult this troubleshooting matrix befo
 
 You can also view all of these instructions (with extra setup configuration details) in our official formatted student guide:
 
-### 👤 [Download the Complete System Manual (PDF)](./System_Manual.pdf)
+### 👤 [View the Complete System Manual](./System_Manual.md)
 
 ---
 
