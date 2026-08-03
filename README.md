@@ -15,7 +15,7 @@
 
 The **ESP32 RFID Anti-Wall-Jumping System** is a robust, real-time perimeter security prototype designed to detect unauthorized access (like wall climbing or jumping) and respond instantly. It leverages an Active IR Beam for detection, a long-range UHF RFID reader for authorized access, a DFPlayer Mini for audio alarms, and a SIM800L module for instant SMS notifications to security personnel.
 
-This **Student Version** of the repository contains the core logic (`main_student.cpp`) fully commented to help you understand the concurrent hardware integrations, FreeRTOS tasks, and AT-command parsing.
+This **Student Version** of the repository contains the core logic (`system_firmware.cpp`) fully commented to help you understand the concurrent hardware integrations, FreeRTOS tasks, and AT-command parsing.
 
 ---
 
@@ -121,7 +121,7 @@ Practical instructions for setup and usage including:
 
 ## 🚀 How to Study This Code
 
-The provided `main_student.cpp` file contains the complete top-level orchestration of the hardware peripherals. You can open `main_student.pdf` for a formatted reading experience or open the `.cpp` file in any text editor. Look at how FreeRTOS separates the sensor polling (`sensorTask`) from the SMS dispatching (`commTask`) so that the ESP32 never misses a tripped alarm while waiting for an SMS to send!
+The provided `system_firmware.cpp` file contains the complete top-level orchestration of the hardware peripherals. You can open `system_firmware.pdf` for a formatted reading experience or open the `.cpp` file in any text editor. Look at how FreeRTOS separates the sensor polling (`sensorTask`) from the SMS dispatching (`commTask`) so that the ESP32 never misses a tripped alarm while waiting for an SMS to send!
 
 <div align="center">
   <i>Developed using C++ and PlatformIO.</i>
