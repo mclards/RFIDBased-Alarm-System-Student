@@ -99,14 +99,14 @@ The system operates under two distinct system modes controlled via the physical 
 
 ### 2.2 Setup Mode (Configuration)
 - **Blue Status LED:** **Blinking Fast** (every 400ms).
-- **How to Enter:** Press and hold the Mode Button for 3 seconds, or send SMS text command `Text AP ON`.
+- **How to Enter:** Press and hold the Mode Button for 3 seconds, or send SMS text command `AP ON`.
 - **System Operation:** Wall breach monitoring is temporarily paused to prevent false alarms. The ESP32 starts its Wi-Fi Access Point (`AntiWallJump-Setup`) and launches the Web Captive Portal.
-- **How to Exit:** Hold the Mode Button for 3 seconds, send `Text AP OFF`, click "Stop Portal" on the web dashboard, or wait 1 hour for automatic idle timeout.
+- **How to Exit:** Hold the Mode Button for 3 seconds, send `AP OFF`, click "Stop Portal" on the web dashboard, or wait 1 hour for automatic idle timeout.
 
 ### 2.3 Remote Control via SMS Commands
 Security personnel can control the system remotely by sending SMS messages to the SIM800L SIM card:
-- `Text AP ON` — Activates Wi-Fi Setup Mode and turns on the configuration web portal.
-- `Text AP OFF` — Deactivates Setup Mode and returns the system to Normal Guarding Mode.
+- `AP ON` — Activates Wi-Fi Setup Mode and turns on the configuration web portal.
+- `AP OFF` — Deactivates Setup Mode and returns the system to Normal Guarding Mode.
 
 *(Note: If **Number Lock** is enabled in the configuration, the system strictly validates the sender's phone number and will only execute commands sent from the registered `guardPhone` number.)*
 
