@@ -1,5 +1,9 @@
 /*
- * STUDENT VERSION - RFID Anti-Wall-Jumping System
+ * ARCHIVED STUDENT WALK-THROUGH - NOT DEPLOYMENT FIRMWARE
+ *
+ * This intentionally simplified snapshot is not part of the PlatformIO build
+ * and does not include the production safety, persistence, authentication,
+ * or modem-retry logic. Build and deploy src/main.cpp only.
  * 
  * This firmware reads RFID tags, detects wall climbing via an IR beam sensor,
  * and sends an SMS alert via a SIM800L module if an intrusion is detected.
@@ -91,7 +95,6 @@ String readRFID();
 void enterConfigMode();
 void exitConfigMode();
 void updateStatusLED();
-void checkSIM800Ready();
 void flushSim800Response();
 void testPlayVoice(int track);
 void stopVoice();
@@ -159,18 +162,22 @@ void setup() {
 
   // Initialize SIM800L for SMS capabilities
   sim800.begin(9600, SERIAL_8N1, SIM800_RX_PIN, SIM800_TX_PIN);
-  Serial.println("[BOOT] Initializing SIM800L...");
-  checkSIM800Ready();
+  Serial.println("[BOOT] SIM800L UART initialized. Network registration deferred to CommTask.");
 
   // Create the FreeRTOS queue for alarms
   alarmQueue = xQueueCreate(20, sizeof(AlarmEvent));
 
-  // Start the background tasks: one for sensors, one for SMS communication
-  // This allows the ESP32 to monitor sensors and send SMS at the same time!
+  // -------------------------------------------------------------
+  // BACKGROUND TASKS (FreeRTOS)
+  // -------------------------------------------------------------
+  // We start two separate background tasks:
+  // 1. "SensorTask" running on Core 0 (Checks IR beams & RFID)
+  // 2. "CommTask" running on Core 1 (Sends SMS messages)
+  // This allows the ESP32 to monitor sensors and send SMS at the exact same time!
   xTaskCreatePinnedToCore(sensorTask, "SensorTask", 8192, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(commTask,   "CommTask",   8192, NULL, 1, NULL, 1);
 
-  Serial.println("[BOOT] System Ready.");
+  Serial.println("[BOOT] Core OS launched. Subsystems initializing asynchronously...");
 }
 
 void loop() {
@@ -403,7 +410,59 @@ void commTask(void *pvParameters) {
   String incomingSMS = "";
   SMSJob currentSMS;
 
+  // Variables for asynchronous SIM800L initialization
+  unsigned long simInitStartTime = millis();
+  unsigned long lastSimCheckTime = 0;
+  bool simInitDone = false;
+  int simInitStep = 0;
+  String simInitResponse = "";
+
   for (;;) {
+    // 0. ASYNCHRONOUS INITIALIZATION
+    // We do this here instead of in setup() so the ESP32 doesn't freeze 
+    // for 1-2 minutes waiting for the GSM network to connect.
+    // The sensors can start working immediately while this happens in the background.
+    if (!simInitDone && !currentSMS.active) {
+      unsigned long now = millis();
+      
+      if (simInitStep == 0) {
+        if (now - simInitStartTime > 1000) simInitStep = 1;
+      } else if (simInitStep == 1) {
+        if (now - lastSimCheckTime > 2000) {
+          lastSimCheckTime = now;
+          simInitResponse = "";
+          sim800.println("AT+CREG?");
+          simInitStep = 2;
+        }
+      } else if (simInitStep == 2) {
+        if (now - lastSimCheckTime > 500) {
+          if (simInitResponse.indexOf("+CREG: 0,1") != -1 || simInitResponse.indexOf("+CREG: 0,5") != -1) {
+            Serial.println("[BOOT] Network registered successfully.");
+            simInitStep = 3;
+            lastSimCheckTime = now;
+          } else if (now - simInitStartTime > 60000) {
+            Serial.println("[WARN] Network registration timeout. Proceeding anyway...");
+            simInitStep = 3;
+            lastSimCheckTime = now;
+          } else {
+            simInitStep = 1;
+          }
+        }
+      } else if (simInitStep == 3) {
+        if (now - lastSimCheckTime > 500) {
+          sim800.println("AT+CMGF=1");
+          simInitStep = 4;
+          lastSimCheckTime = now;
+        }
+      } else if (simInitStep == 4) {
+        if (now - lastSimCheckTime > 200) {
+          sim800.println("AT+CNMI=1,2,0,0,0");
+          simInitDone = true;
+          Serial.println("[BOOT] SIM800L is fully initialized and ready to send SMS.");
+        }
+      }
+    }
+
     // 1. Process outgoing SMS alarms
     if (currentMode != MODE_CONFIG) {
       // If there is an alarm in the queue, prepare to send it
@@ -471,11 +530,12 @@ void commTask(void *pvParameters) {
       }
     }
 
-    // 2. Process incoming SMS commands
+    // 2. Process incoming SMS commands and SIM800 responses
     int maxBytes = 128;
     while (sim800.available() && maxBytes-- > 0) {
       char c = sim800.read();
       incomingSMS += c;
+      if (!simInitDone) simInitResponse += c;
     }
 
     if (incomingSMS.length() > 0) {
@@ -589,37 +649,9 @@ void updateLocalAlarm() {
   }
 }
 
-// Initializes SIM800L and waits for GSM Network Registration
-void checkSIM800Ready() {
-  sim800.println("AT");
-  delay(500);
-  flushSim800Response();
-  
-  unsigned long startWait = millis();
-  while (millis() - startWait < 60000) {
-    sim800.println("AT+CREG?"); // Check registration status
-    delay(1000);
-    
-    String response = "";
-    while (sim800.available()) { response += (char)sim800.read(); }
-    
-    // "0,1" or "0,5" means successfully registered on home or roaming network
-    if (response.indexOf("+CREG: 0,1") != -1 || response.indexOf("+CREG: 0,5") != -1) {
-      break;
-    }
-    delay(1000);
-  }
-
-  sim800.println("AT+CMGF=1"); // Set SMS to Text Mode
-  delay(200);
-  sim800.println("AT+CNMI=1,2,0,0,0"); // Route incoming SMS directly to Serial port
-  delay(200);
-  flushSim800Response();
-}
-
 void flushSim800Response() {
   while (sim800.available()) {
-    Serial.write(sim800.read());
+    sim800.read(); // Drop the raw character to prevent terminal echo
   }
 }
 
