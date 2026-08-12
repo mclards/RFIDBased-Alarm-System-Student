@@ -143,6 +143,14 @@ Once the system is powered on and running `system_firmware.cpp`, it operates aut
    - The SIM800L queues and sends an SMS alert to the registered security number.
    - The event is written to the SD Card.
 
+### ⚙️ Optimal Web Dashboard Settings
+If configuring this device via the built-in Wi-Fi Captive Portal (`http://192.168.4.1`), these default times are optimal for large campuses:
+- **RFID Tag Retention / Memory:** `30000 ms` (30s)
+- **SMS Grouping / Bucketing Window:** `10000 ms` (10s)
+- **Alarm Duration:** `30000 ms` (30s)
+- **Alarm Cooldown:** `60000 ms` (60s)
+- **Sensor Breach Memory:** `5000 ms` (5s)
+
 2. **Safe Passage Event (Authorized Access)**:
    - A person with an authorized UHF RFID tag approaches the panel.
    - The system registers the ID and flashes the Status LED.

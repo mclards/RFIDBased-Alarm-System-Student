@@ -134,6 +134,14 @@ Security personnel can control the system remotely by sending SMS messages to th
   - ⚙️ **Settings:** Configure Guard Phone Number, SMS Recipient Role, Wall Label, Alarm Voice Track, Alarm Duration, Cooldown, and Admin Passwords.
   - 📁 **Records:** View live intrusion logs and download complete CSV security reports.
 
+### 3.3 Optimal Configuration Defaults
+For large physical perimeters, the following time-based settings are recommended for best performance:
+- **RFID Memory / Tag Retention:** `30000 ms` (30s) — Time window a student has to jump the wall after scanning their ID.
+- **Bucketing Window:** `10000 ms` (10s) — Wait time after an alarm starts to gather any other students jumping into the same SMS alert.
+- **Breach Memory / Sensor Hold:** `5000 ms` (5s) — How long the system remembers a motion sensor trigger before clearing it.
+- **Cooldown Time:** `60000 ms` (60s) — Wait time after an alarm before the system can trigger again (prevents SMS spam).
+- **Alarm Duration:** `30000 ms` (30s) — How long the alarm siren will sound when someone jumps the wall.
+
 <div class="page-break"></div>
 
 ## 🪪 4. Student ID Cards & Registry Management
