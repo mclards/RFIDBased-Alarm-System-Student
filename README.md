@@ -57,6 +57,34 @@ This **Student Version** of the repository contains the core code (`system_firmw
 
 ---
 
+## 📊 Bill of Materials & Procurement (BOM)
+
+The complete component quotation, pricing breakdown, and labor calculations are documented in the official spreadsheet:
+
+📄 **[Download Official Bill of Materials Spreadsheet (Grade10-Studds.xlsx)](./Grade10-Studds.xlsx)** *(or [Grade10-Studds-V2.xlsx](./Grade10-Studds-V2.xlsx))*
+
+### V2 Hardware Migration & Component Summary
+
+| Category | Component / Module | Purpose / Migration Details | Qty | Unit Price |
+| :--- | :--- | :--- | :---: | :---: |
+| **Major (V2 Active)** | **ESP32 DevKit (30-pin, WROOM-32)** | Main dual-core FreeRTOS processor & state machine | 1 | ₱390.00 |
+| **Major (V2 Active)** | **RD906M Long-Range UHF RFID Reader** | 860–960 MHz Wiegand 26/34 reader *(Migrated from MFRC522)* | 1 | ₱12,630.00 |
+| **Major (V2 Active)** | **Waterproof Active Dual-Beam IR Sensor** | Optical infrared tripwire detector *(Migrated from HC-SR04)* | 1 | ₱1,430.00 |
+| **Major (V2 Active)** | **Alien H3 Long-Range UHF RFID Cards** | 860–960 MHz tracking cards *(Migrated from 13.56MHz tags)* | 10 | ₱120.00 |
+| **Major (V2 Active)** | **SIM800L GSM/GPRS Module** | SMS alerts to security personnel | 1 | ₱390.00 |
+| **Major (V2 Active)** | **DFPlayer Mini MP3 Player** | Spoken voice warnings & high-output alarm siren | 1 | ₱300.00 |
+| **Major (V2 Active)** | **DS3231 Precision RTC Module** | Battery-backed hardware timestamping | 1 | ₱165.00 |
+| **Major (V2 Active)** | **MicroSD Card Module (SPI)** | FAT32 master logs & student database storage | 1 | ₱75.00 |
+| **Major (V2 Active)** | **12V/4A Power Supply & Charger** | Main power supply and Li-ion backup battery charger | 1 | ₱840.00 |
+| **Major (V2 Active)** | **18650 Li-ion Batteries (3.7V)** | Uninterruptible backup power during outages | 4 | ₱110.00 |
+| **Major (V2 Active)** | **Weatherproof ABS Enclosure** | Outdoor ABS wall-mountable protective casing | 1 | ₱380.00 |
+| **Support Hardware** | Supporting Electronics & Wiring | Speakers, Buck Converters, PCBs, LEDs, Resistors, Jumper Wires | Lot | ₱1,270.00 |
+| **Replaced (V1 Legacy)** | *MFRC522, Keychain Tags, HC-SR04* | *[Deprecated]* Replaced by UHF RFID & Active IR Sensors | Lot | *₱530.00* |
+| **Procurement Total** | **Subtotal Materials + Shipping** | Materials (₱20,040.00) + Shipping Fees (₱720.00) | — | **₱20,760.00** |
+| **Project Total** | **Materials + Labor (40 hrs)** | Materials & SF (₱20,760.00) + Labor & Prog. (₱10,000.00) | — | **₱30,760.00** |
+
+---
+
 ## 🔌 Schematic Circuit Diagram
 
 For full hardware wiring instructions and component mapping, please refer to the official wiring schematic:

@@ -65,6 +65,9 @@ graph TD
 | **Visual Indicators**| 5mm LEDs (Red Alarm / Blue Status)| Direct GPIO Drive | 3.3V DC via 220 Ω | Real-time system state and alarm annunciation |
 | **User Pushbutton** | Momentary Pushbutton | Active-LOW Input | 3.3V DC (10 kΩ Pullup) | Manual toggle between Guarding and Setup Mode |
 
+> [!TIP]
+> **Procurement & Pricing:** For complete pricing, itemized supplier costs, and labor breakdown, refer to the official [Bill of Materials (Grade10-Studds.xlsx)](./Grade10-Studds.xlsx) or [Grade10-Studds-V2.xlsx](./Grade10-Studds-V2.xlsx).
+
 ---
 
 ### 3.2 Visual Hardware Layout Reference
