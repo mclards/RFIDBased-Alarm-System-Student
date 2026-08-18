@@ -61,7 +61,7 @@ This **Student Version** of the repository contains the core code (`system_firmw
 
 The complete component quotation, pricing breakdown, and labor calculations are documented in the official spreadsheet:
 
-📄 **[Download Official Bill of Materials Spreadsheet (Grade10-Studds.xlsx)](./Grade10-Studds.xlsx)** *(or [Grade10-Studds-V2.xlsx](./Grade10-Studds-V2.xlsx))*
+📄 **[Download Official Bill of Materials Spreadsheet (Grade10-Studds-V2.xlsx)](./Grade10-Studds-V2.xlsx)**
 
 ### V2 Hardware Migration & Component Summary
 
