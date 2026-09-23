@@ -6,8 +6,18 @@
   [![PlatformIO](https://img.shields.io/badge/PlatformIO-orange?style=for-the-badge&logo=platformio&logoColor=white)](https://platformio.org/)
   [![ESP32](https://img.shields.io/badge/ESP32-blue?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/)
   [![C++](https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)](https://isocpp.org/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+  [![Interactive Simulator](https://img.shields.io/badge/🎮_Live_Simulator-Run_in_Browser-success?style=for-the-badge&logo=html5&logoColor=white)](https://raw.githack.com/mclards/RFIDBased-Alarm-System-Student/master/simulator.html)
 </div>
+
+---
+
+## 🎮 Live Interactive Simulator (Run in Browser)
+
+Want to see how the system works without touching any hardware? You can test student RFID cards, break the IR beam, view the timing gauges, and hear the audio siren directly in your browser:
+
+- **🚀 [Launch Interactive Simulator](https://raw.githack.com/mclards/RFIDBased-Alarm-System-Student/master/simulator.html)** *(Instant in-browser execution via GitHack CDN)*
+- **🌐 [Alternative Mirror via HTMLPreview](https://htmlpreview.github.io/?https://github.com/mclards/RFIDBased-Alarm-System-Student/blob/master/simulator.html)**
+- **💻 Offline Mode:** Clone this repository and double-click [`simulator.html`](./simulator.html) to open in Google Chrome, Microsoft Edge, or Firefox.
 
 ---
 

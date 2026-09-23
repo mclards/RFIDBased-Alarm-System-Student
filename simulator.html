@@ -1,0 +1,2369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Campus Perimeter Alarm System — Full System Simulator (Exact Firmware Mirror)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    :root {
+      --background: #09090b;
+      --foreground: #f4f4f5;
+      --card: #131316;
+      --card-foreground: #fafafa;
+      --border: #27272a;
+      --muted: #202025;
+      --muted-foreground: #a1a1aa;
+    }
+    @keyframes siren-strobe {
+      0%, 100% { opacity: 0.2; transform: scale(1); filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.4)); }
+      50% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 30px rgba(239, 68, 68, 1)); }
+    }
+    .strobe-active {
+      animation: siren-strobe 0.22s infinite alternate ease-in-out;
+    }
+    @keyframes ir-beam-pulse {
+      0%, 100% { opacity: 0.9; filter: drop-shadow(0 0 7px rgba(239, 68, 68, 0.9)); }
+      50% { opacity: 0.35; filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.3)); }
+    }
+    .beam-laser {
+      animation: ir-beam-pulse 1s infinite ease-in-out;
+    }
+    @keyframes phone-vibrate {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      20% { transform: translate(-3px, 2px) rotate(-1deg); }
+      40% { transform: translate(3px, -2px) rotate(1deg); }
+      60% { transform: translate(-3px, -1px) rotate(-1deg); }
+      80% { transform: translate(3px, 1px) rotate(1deg); }
+    }
+    .phone-alert {
+      animation: phone-vibrate 0.25s infinite ease-in-out;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: var(--border, #3f3f46);
+      border-radius: 4px;
+    }
+    html, body {
+      background-color: #09090b !important;
+      color: #f4f4f5 !important;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen p-2 sm:p-3 antialiased selection:bg-blue-500 selection:text-white" style="background-color: #09090b; color: #f4f4f5;">
+
+  <!-- Main Container -->
+  <div class="max-w-[1720px] w-full mx-auto space-y-2">
+
+    <!-- Top Bar: System Header & Global Speed/Audio Controls -->
+    <header class="bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 shadow-md flex flex-wrap items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold text-[10px] tracking-wider border border-emerald-500/30">ESP32 1:1 MIRROR</span>
+        <h1 class="text-sm sm:text-base font-bold tracking-tight text-white">Perimeter Alarm System Simulator</h1>
+        <span class="hidden xl:inline text-xs text-zinc-400 border-l border-zinc-700 pl-2 font-mono">
+          src/main.cpp • storage.h • rfid_bucket.h
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
+        <!-- Audio Synthesizer Toggle -->
+        <button id="btnSoundToggle" onclick="toggleSound()" class="px-2.5 py-1 rounded-lg text-xs font-semibold border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 transition-all flex items-center gap-1 shadow-sm">
+          <span id="soundIcon">🔊</span>
+          <span id="soundLabel">Synth: On</span>
+        </button>
+
+        <!-- Simulation Time Display -->
+        <div class="bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded-lg font-mono text-xs flex items-center gap-1.5 shadow-inner">
+          <span class="text-zinc-400 text-[11px] font-bold">MILLIS():</span>
+          <span id="txtSimMillis" class="font-bold text-blue-400">0 ms</span>
+          <span class="text-[11px] text-zinc-400">(<span id="txtSimTimeSec" class="text-zinc-300">0.0s</span>)</span>
+        </div>
+
+        <!-- Play / Pause -->
+        <button id="btnSimPause" onclick="toggleSimPause()" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-sm flex items-center gap-1 transition-all">
+          <span id="simPauseIcon">⏸</span>
+          <span id="simPauseText">Pause</span>
+        </button>
+
+        <!-- Speed Selector -->
+        <div class="flex border border-zinc-700 rounded-lg overflow-hidden text-xs font-semibold bg-zinc-950">
+          <button onclick="setSimSpeed(1)" class="speed-btn px-2.5 py-1 bg-blue-500/20 text-blue-400 font-bold" data-spd="1">1x</button>
+          <button onclick="setSimSpeed(2)" class="speed-btn px-2.5 py-1 text-zinc-300 hover:bg-zinc-800 font-bold" data-spd="2">2x</button>
+          <button onclick="setSimSpeed(5)" class="speed-btn px-2.5 py-1 text-zinc-300 hover:bg-zinc-800 font-bold" data-spd="5">5x</button>
+        </div>
+
+        <!-- Student 10s Cooldown Interactive Demonstration -->
+        <button onclick="runStudentCooldownScenario()" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 flex items-center gap-1 transition-all shadow-sm" title="Demonstrate why 10s cooldown + 10s bucketWindowMs results in a 20s cycle">
+          <span>🔬</span> Test 10s Cooldown
+        </button>
+
+        <!-- Master Reset -->
+        <button onclick="resetFullSystem()" class="px-2.5 py-1 rounded-lg text-xs font-bold border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors shadow-sm">
+          ↺ Reset
+        </button>
+
+        <!-- Fullscreen Toggle -->
+        <button id="btnFullscreen" onclick="toggleFullscreen()" class="px-2.5 py-1 rounded-lg text-xs font-bold border border-blue-500/40 text-blue-300 hover:bg-blue-500/10 transition-colors flex items-center gap-1 shadow-sm">
+          <span>⛶</span> Fullscreen
+        </button>
+      </div>
+    </header>
+
+    <!-- ======================================================== -->
+    <!-- REAL-TIME FIRMWARE TIMERS & ENGINE HUD (TOP BAR) -->
+    <!-- ======================================================== -->
+    <section class="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 sm:p-3 shadow-md space-y-2">
+      <div class="flex flex-wrap items-center justify-between gap-1.5 border-b border-zinc-800 pb-1.5 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <h2 class="text-xs sm:text-sm font-bold tracking-wide uppercase text-white flex items-center gap-1.5">
+            <span>⚡</span> Real-Time Firmware Timers & Engine HUD
+          </h2>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-bold">Tick: 50ms</span>
+        </div>
+        <div class="text-[11px] font-mono text-zinc-300 flex items-center gap-2 font-medium">
+          <span>SysConfig: <strong class="text-blue-400">10s Alarm</strong> • <strong class="text-purple-400">5s Bucketing</strong> • <strong class="text-amber-400">10s Cooldown</strong> • <strong class="text-cyan-400">5s Tag Mem</strong> • <strong class="text-rose-400">4.95s Grace</strong></span>
+        </div>
+      </div>
+
+      <!-- 7 Live Running Timer Cards Grid (Labels Matched 1:1 with ESP32 Setting Portal) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-1.5 sm:gap-2">
+
+        <!-- 1. Master Simulation Clock -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-zinc-300 flex items-center gap-1">
+              <span>⏱️</span> Master Clock
+            </span>
+            <span id="hudClockBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">RUNNING</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudClockVal" class="text-base sm:text-lg font-mono font-black text-blue-400 leading-none">0.0s</div>
+            <div id="hudClockSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">12:30:00 PM • 0ms</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudClockBar" class="bg-blue-500 h-full rounded-full transition-all duration-75" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- 2. Cooldown Time (s) [Portal: Cooldown Time (s)] -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-amber-400 flex items-center gap-1" title="Cooldown Time (s)">
+              <span>⏳</span> Cooldown Time (s)
+            </span>
+            <span id="hudCooldownBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">ARMED</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudCooldownVal" class="text-base sm:text-lg font-mono font-black text-emerald-400 leading-none">READY</div>
+            <div id="hudCooldownSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">10.0s armed</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudCooldownBar" class="bg-emerald-500 h-full rounded-full transition-all duration-75" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- 3. Alarm Duration (s) [Portal: Alarm Duration (s)] -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-red-400 flex items-center gap-1" title="Alarm Duration (s)">
+              <span>🔊</span> Alarm Duration (s)
+            </span>
+            <span id="hudSirenBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">SILENT</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudSirenVal" class="text-base sm:text-lg font-mono font-black text-red-400 leading-none">SILENT</div>
+            <div id="hudSirenSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">10.0s standby</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudSirenBar" class="bg-red-500 h-full rounded-full transition-all duration-75" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- 4. Bucketing Window (s) [Portal: Bucketing Window (s)] -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-purple-400 flex items-center gap-1" title="Bucketing Window (s)">
+              <span>🪣</span> Bucketing Window (s)
+            </span>
+            <span id="hudBucketBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">IDLE</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudBucketVal" class="text-base sm:text-lg font-mono font-black text-purple-400 leading-none">IDLE</div>
+            <div id="hudBucketSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">5.0s ready</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudBucketBar" class="bg-purple-500 h-full rounded-full transition-all duration-75" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- 5. Breach Memory (s) [Portal: Breach Memory (s)] -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-rose-400 flex items-center gap-1" title="Breach Memory (s)">
+              <span>🚨</span> Breach Memory (s)
+            </span>
+            <span id="hudGraceBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">CLEAR</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudGraceVal" class="text-base sm:text-lg font-mono font-black text-rose-400 leading-none">CLEAR</div>
+            <div id="hudGraceSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">Card match wait</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudGraceBar" class="bg-rose-500 h-full rounded-full transition-all duration-75" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- 6. RFID Memory (s) [Portal: RFID Memory (s)] -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-cyan-400 flex items-center gap-1" title="RFID Memory (s)">
+              <span>🏷️</span> RFID Memory (s)
+            </span>
+            <span id="hudTagBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">EMPTY</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudTagVal" class="text-base sm:text-lg font-mono font-black text-cyan-400 leading-none">EMPTY</div>
+            <div id="hudTagSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">5.0s pre-breach</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudTagBar" class="bg-cyan-500 h-full rounded-full transition-all duration-75" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- 7. IR Alert Delay (min) [Portal: IR Alert Delay (min)] -->
+        <div class="bg-zinc-950 border border-zinc-800/90 rounded-lg p-2.5 flex flex-col justify-between h-[68px] relative overflow-hidden group shadow-sm">
+          <div class="flex items-center justify-between leading-none">
+            <span class="text-xs font-bold text-emerald-400 flex items-center gap-1" title="IR Alert Delay (min)">
+              <span>🚧</span> IR Alert Delay (min)
+            </span>
+            <span id="hudBeamBadge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">ALIGNED</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <div id="hudBeamVal" class="text-base sm:text-lg font-mono font-black text-emerald-400 leading-none">0.0s</div>
+            <div id="hudBeamSub" class="text-[11px] font-mono text-zinc-300 truncate font-medium">15m alert limit</div>
+          </div>
+          <div class="w-full bg-zinc-800/80 rounded-full h-1 overflow-hidden">
+            <div id="hudBeamBar" class="bg-emerald-500 h-full rounded-full transition-all duration-75" style="width: 0%;"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="flex border-b border-zinc-800 gap-1.5 overflow-x-auto pb-0.5 text-xs font-medium">
+      <button onclick="switchTab('bench')" id="tabBtnBench" class="tab-nav px-3.5 py-1.5 rounded-t-lg border-b-2 border-blue-500 text-blue-400 bg-zinc-900 font-bold flex items-center gap-1.5 shadow-sm">
+        <span>🔬</span> Workbench & Sensors
+      </button>
+      <button onclick="switchTab('timeline')" id="tabBtnTimeline" class="tab-nav px-3.5 py-1.5 rounded-t-lg border-b-2 border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 font-semibold flex items-center gap-1.5 transition-colors">
+        <span>📊</span> Cooldown & Timing Gantt
+      </button>
+      <button onclick="switchTab('portal')" id="tabBtnPortal" class="tab-nav px-3.5 py-1.5 rounded-t-lg border-b-2 border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 font-semibold flex items-center gap-1.5 transition-colors">
+        <span>🌐</span> Web Portal (192.168.4.1)
+      </button>
+      <button onclick="switchTab('sdcard')" id="tabBtnSdcard" class="tab-nav px-3.5 py-1.5 rounded-t-lg border-b-2 border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 font-semibold flex items-center gap-1.5 transition-colors">
+        <span>💾</span> MicroSD Files & Logs
+      </button>
+      <button onclick="switchTab('rtos')" id="tabBtnRtos" class="tab-nav px-3.5 py-1.5 rounded-t-lg border-b-2 border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40 font-semibold flex items-center gap-1.5 transition-colors">
+        <span>⚙️</span> FreeRTOS State Engine
+      </button>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: WORKBENCH & SENSORS -->
+    <!-- ======================================================== -->
+    <main id="tabContentBench" class="space-y-2.5">
+
+      <section class="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+
+        <!-- Left 8 Cols: Physical Perimeter Wall & Sensor Layout -->
+        <div class="lg:col-span-8 space-y-2.5">
+
+          <!-- 1. The Campus Perimeter Fence & IR Beam Zone -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-md space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
+                  <span>🧱</span> Perimeter Wall Section A — Active IR Beam (GPIO 14)
+                </h2>
+                <p class="text-xs text-zinc-400 font-medium">Normally-Closed optical loop pulls HIGH on breach. Hardware debounced 25ms.</p>
+              </div>
+
+              <!-- Beam Sensor Status Pill -->
+              <div id="badgeBeamStatus" class="px-3 py-1 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="txtBeamStatus">BEAM ALIGNED & CLEAR</span>
+              </div>
+            </div>
+
+            <!-- Visual Fence & Optical Beam Diagram -->
+            <div class="relative bg-zinc-950 rounded-xl p-3 border border-zinc-800/90 overflow-hidden select-none min-h-[92px] flex flex-col justify-between shadow-inner">
+              <!-- Top Optical Laser Beam Line -->
+              <div class="relative w-full h-8 flex items-center px-6">
+                <!-- IR Transmitter (TX) Post -->
+                <div class="absolute left-2 top-0 bottom-0 w-6 bg-zinc-800 rounded-lg border border-zinc-700 flex flex-col items-center justify-center shadow-md">
+                  <div class="w-2.5 h-2.5 rounded-full bg-red-600 shadow-[0_0_10px_rgba(239,68,68,1)] animate-pulse"></div>
+                  <span class="text-[9px] font-bold text-zinc-200 font-mono mt-0.5">TX</span>
+                </div>
+
+                <!-- Infrared Optical Beam Laser -->
+                <div id="visualBeamLine" class="w-full h-1 bg-red-500 beam-laser shadow-[0_0_14px_rgba(239,68,68,1)] rounded-full mx-5"></div>
+
+                <!-- IR Receiver (RX) Post -->
+                <div class="absolute right-2 top-0 bottom-0 w-6 bg-zinc-800 rounded-lg border border-zinc-700 flex flex-col items-center justify-center shadow-md">
+                  <div id="rxSensorDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]"></div>
+                  <span class="text-[9px] font-bold text-zinc-200 font-mono mt-0.5">RX</span>
+                </div>
+              </div>
+
+              <!-- Crossing Intruder Visual / Wall Zone -->
+              <div class="relative z-10 flex items-center justify-between px-6 pt-1">
+                <div class="flex items-center gap-2.5">
+                  <div id="fenceCrossAnim" class="text-3xl transition-transform duration-300 drop-shadow-md">
+                    🏃‍♂️
+                  </div>
+                  <span class="text-[11px] font-mono font-semibold text-zinc-400 uppercase tracking-wider">
+                    2.5M PERIMETER BRICK WALL • ACTIVE BEAM PATH
+                  </span>
+                </div>
+                <div class="text-[11px] font-mono text-zinc-400">
+                  Relay: <strong class="text-emerald-400">NORMAL_CLOSED (NC)</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dedicated Interactive Simulation Control Toolbar -->
+            <div class="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-2 px-3 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-zinc-200">⚡ Breach Controls:</span>
+                <span class="text-[11px] text-zinc-400 font-medium">Trigger optical beam break scenario:</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="triggerJumpWallPulse()" class="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-transform active:scale-95 shadow-md flex items-center gap-1.5">
+                  <span>⚡</span> Jump Wall (Break Beam 400ms)
+                </button>
+                <button id="btnHoldObstruction" onclick="toggleHoldObstruction()" class="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-100 font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm">
+                  <span>🚫</span> <span id="txtHoldObstruction">Hold Obstruction (Continuous)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- IR Sensor Firmware State Indicators -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+              <div class="p-2 rounded-lg bg-zinc-950 border border-zinc-800/90 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div class="text-[11px] font-bold text-zinc-300 tracking-wide uppercase">BEAM LATCH</div>
+                  <div class="text-[9px] text-zinc-400 font-mono">waitingForBeamRecovery</div>
+                </div>
+                <div id="valWaitingRecovery" class="font-bold text-emerald-400 text-xs mt-1">false (Unlatched)</div>
+              </div>
+
+              <div class="p-2 rounded-lg bg-zinc-950 border border-zinc-800/90 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div class="text-[11px] font-bold text-zinc-300 tracking-wide uppercase">BREACH MEMORY</div>
+                  <div class="text-[9px] text-zinc-400 font-mono">breachRemembered</div>
+                </div>
+                <div id="valBreachRemembered" class="font-bold text-zinc-300 text-xs mt-1">false</div>
+              </div>
+
+              <div class="p-2 rounded-lg bg-zinc-950 border border-zinc-800/90 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div class="text-[11px] font-bold text-zinc-300 tracking-wide uppercase">BREACH GRACE</div>
+                  <div class="text-[9px] text-zinc-400 font-mono">breachMemoryMs - 50ms</div>
+                </div>
+                <div id="valBreachGrace" class="font-bold text-blue-400 text-xs mt-1">4.95s (Card Wait)</div>
+              </div>
+
+              <div class="p-2 rounded-lg bg-zinc-950 border border-zinc-800/90 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div class="text-[11px] font-bold text-zinc-300 tracking-wide uppercase">DEBOUNCE FILTER</div>
+                  <div class="text-[9px] text-zinc-400 font-mono">IR_RECOVERY_DEBOUNCE</div>
+                </div>
+                <div class="font-bold text-purple-400 text-xs mt-1">500 ms Quiet Window</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Wiegand 26/34-bit RFID Reader Station -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-md space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
+                  <span>💳</span> Wiegand RFID Reader Station (GPIO 21 D0, 22 D1)
+                </h2>
+                <p class="text-xs text-zinc-400 font-medium">Click any card to tap reader (18 Registered + 1 Unregistered — All visible simultaneously without scrolling)</p>
+              </div>
+
+              <!-- Reader LED -->
+              <div class="flex items-center gap-1.5 text-xs font-mono">
+                <span class="text-zinc-300 text-xs font-bold">READER LED:</span>
+                <span id="rfidReaderBuzzer" class="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.9)] transition-all"></span>
+              </div>
+            </div>
+
+            <!-- Interactive Sample Student Cards to Tap (Compact Full-View Grid, No Scrollbar) -->
+            <div class="space-y-2">
+              <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/30 font-bold">18 Registered Students + 1 Unregistered</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <input type="text" id="studentSearchInput" oninput="filterStudentCards(this.value)" placeholder="Search name, ID or HEX tag..." class="px-2.5 py-1 text-xs rounded-lg bg-zinc-950 border border-zinc-700 text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500 w-52">
+                  <span id="txtPreBreachCountdown" class="font-mono text-blue-400 text-xs font-bold"></span>
+                </div>
+              </div>
+
+              <!-- Student Cards Grid Container (All 19 Cards Fully Visible, No Scrolling Needed) -->
+              <div id="studentCardsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                <!-- Populated dynamically by renderStudentCards() in compact format -->
+              </div>
+            </div>
+
+            <!-- RFID Bucket Queue Live State -->
+            <div class="p-2 px-3 rounded-lg bg-zinc-950 border border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-purple-300 text-xs">RFIDBucket Engine:</span>
+                <span id="txtRfidBucketInfo" class="font-mono text-zinc-300 text-xs font-medium">Empty (Idle)</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono font-medium">
+                <span>tagMemoryMs: <strong id="valTagMemorySec" class="text-blue-400">5s</strong></span>
+                <span>•</span>
+                <span>bucketWindowMs: <strong id="valBucketWindowSec" class="text-purple-400">5s</strong></span>
+                <span>•</span>
+                <span>Max Limit: <strong class="text-amber-400">180s</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Hardware Controller Box: LEDs, Audio DFPlayer & Mode Button -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-md space-y-2">
+            <h2 class="text-xs sm:text-sm font-bold flex items-center gap-1.5 text-white">
+              <span>🎛️</span> ESP32 Actuators & Physical Interfaces
+            </h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+
+              <!-- Strobe LED (GPIO 4) -->
+              <div class="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between px-3 shadow-sm">
+                <div>
+                  <span class="text-[11px] text-zinc-400 font-mono font-bold block">ALARM LED (GPIO 4)</span>
+                  <div id="txtStrobeLed" class="text-xs font-mono font-bold text-zinc-400 mt-0.5">LOW (OFF)</div>
+                </div>
+                <div id="lampStrobeLed" class="w-9 h-9 rounded-full bg-red-950 border border-red-800 flex items-center justify-center transition-all">
+                  <span class="text-base">🚨</span>
+                </div>
+              </div>
+
+              <!-- Status LED (GPIO 13) & Mode Button (GPIO 34) -->
+              <div class="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-between px-3 shadow-sm">
+                <div>
+                  <span class="text-[11px] text-zinc-400 font-mono font-bold block">MODE (GPIO 13 & 34)</span>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <div id="lampStatusLed" class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)] animate-pulse"></div>
+                    <span id="txtSystemMode" class="text-xs font-mono font-bold text-emerald-400">MODE_NORMAL</span>
+                  </div>
+                </div>
+                <button id="btnModeHold" onmousedown="startModeButtonHold()" onmouseup="abortModeButtonHold()" class="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-700 active:bg-zinc-600 transition-colors shadow-sm">
+                  <span id="txtModeHoldLabel">Hold 3s</span>
+                </button>
+              </div>
+
+              <!-- DFPlayer Mini Siren & Voice Audio (UART TX 2 / RX 15) -->
+              <div class="p-2.5 rounded-lg bg-zinc-950 border border-zinc-800 flex flex-col justify-between space-y-1 shadow-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] text-zinc-400 font-mono font-bold">DFPLAYER MINI</span>
+                  <span id="badgeAudioState" class="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 font-bold">IDLE</span>
+                </div>
+                <div class="text-xs font-semibold truncate text-zinc-200" id="txtCurrentTrack">
+                  Track 1: "Please return to class..."
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                  <span class="text-zinc-400 text-xs font-bold">Vol:</span>
+                  <input type="range" id="sliderVolume" min="0" max="30" value="30" oninput="changeVolume()" class="w-full h-1 bg-zinc-700 rounded-lg">
+                  <span id="txtVolumeVal" class="text-xs font-mono font-bold w-5 text-zinc-200">30</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right 4 Cols: Virtual Guard Smartphone (SIM800L Cellular Target) -->
+        <div class="lg:col-span-4 space-y-2.5">
+
+          <!-- Virtual Guard Phone Enclosure -->
+          <div class="bg-zinc-950 border-2 border-zinc-800 rounded-3xl p-3 shadow-2xl space-y-2 relative overflow-hidden select-none" id="guardPhoneBody">
+            <!-- Speaker notch & Front camera -->
+            <div class="flex justify-center items-center gap-2 pt-0.5 pb-0.5">
+              <div class="w-12 h-1 bg-zinc-800 rounded-full"></div>
+              <div class="w-2.5 h-2.5 bg-zinc-900 rounded-full border border-zinc-800"></div>
+            </div>
+
+            <!-- Phone Screen Header (Carrier & Clock) -->
+            <div class="flex justify-between items-center px-2 text-[11px] font-mono font-bold text-zinc-300 border-b border-zinc-800 pb-1.5">
+              <span id="phoneClock">12:30:00 PM</span>
+              <div class="flex items-center gap-2">
+                <span>SIM800L GSM</span>
+                <span>📶 24</span>
+                <span>🔋 99%</span>
+              </div>
+            </div>
+
+            <!-- Messaging App Header -->
+            <div class="bg-zinc-900/90 rounded-xl p-2.5 flex items-center justify-between border border-zinc-800">
+              <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shadow">
+                  🛡️
+                </div>
+                <div>
+                  <div class="font-bold text-xs text-white">Campus Security Guard</div>
+                  <div class="text-[10px] text-zinc-300 font-mono">+63 912 345 6789</div>
+                </div>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono font-bold">ACTIVE</span>
+            </div>
+
+            <!-- SMS Message Thread Window (Compact 185px) -->
+            <div id="phoneSmsThread" class="h-[185px] overflow-y-auto space-y-2 pr-1 font-sans text-xs scrollbar-thin">
+              <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 text-zinc-200 space-y-1">
+                <div class="flex justify-between text-[10px] text-zinc-400 font-mono font-bold">
+                  <span>SIM800L GATEWAY</span>
+                  <span>BOOT</span>
+                </div>
+                <p class="text-xs leading-relaxed text-zinc-100 font-medium">
+                  [SYSTEM READY]<br>Perimeter security node NODE_01 operational at Wall Section A.
+                </p>
+              </div>
+            </div>
+
+            <!-- Interactive Guard SMS Remote Commands -->
+            <div class="border-t border-zinc-800 pt-2 space-y-1.5">
+              <div class="text-[10px] font-mono text-zinc-300 flex items-center justify-between font-bold">
+                <span>SMS COMMANDS (+639123456789):</span>
+                <span class="text-emerald-400">AUTHORIZED</span>
+              </div>
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-[10px] font-mono scrollbar-none font-bold">
+                <button onclick="sendPhoneSMS('LOCK DEVICE')" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-red-300 border border-red-500/40 whitespace-nowrap active:scale-95 transition-all">🔒 LOCK</button>
+                <button onclick="sendPhoneSMS('UNLOCK DEVICE')" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-emerald-300 border border-emerald-500/40 whitespace-nowrap active:scale-95 transition-all">🔓 UNLOCK</button>
+                <button onclick="sendPhoneSMS('AP ON')" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-blue-300 border border-blue-500/40 whitespace-nowrap active:scale-95 transition-all">📶 AP ON</button>
+                <button onclick="sendPhoneSMS('AP OFF')" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-600 whitespace-nowrap active:scale-95 transition-all">📵 AP OFF</button>
+                <button onclick="sendPhoneSMS('RESTORE FACTORY SETTINGS')" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/40 whitespace-nowrap active:scale-95 transition-all">♻️ RESET</button>
+              </div>
+              <div class="flex gap-1.5">
+                <input type="text" id="phoneSmsInput" placeholder="Type SMS (e.g. LOCK DEVICE)..." onkeydown="if(event.key==='Enter') sendPhoneSmsCustom()" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-blue-500">
+                <button onclick="sendPhoneSmsCustom()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-lg text-white font-bold text-xs transition-all">Send</button>
+              </div>
+            </div>
+
+            <!-- Bottom Home Bar -->
+            <div class="pt-1 flex justify-center">
+              <div class="w-16 h-1 bg-zinc-700 rounded-full"></div>
+            </div>
+          </div>
+
+          <!-- Cellular Modem Status Card -->
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-xs font-mono space-y-1 shadow-sm">
+            <div class="flex justify-between font-bold">
+              <span class="text-blue-400">SIM800L UART2 (16/17)</span>
+              <span class="text-emerald-400">NET REG: HOME</span>
+            </div>
+            <div class="text-zinc-300 text-xs font-medium">AT State: <span id="txtModemState" class="text-white font-bold">IDLE</span></div>
+            <div class="text-zinc-300 text-xs font-medium">alarmQueue Delivery: <span id="txtInFlightSms" class="text-amber-400 font-bold">0 in queue</span></div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- Live ESP32 UART0 Console -->
+      <section class="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow-md space-y-2">
+        <div class="flex items-center justify-between text-xs border-b border-zinc-800 pb-1.5">
+          <div class="flex items-center gap-2 font-mono font-bold text-xs text-white">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>ESP32 Serial Monitor (115200 baud)</span>
+          </div>
+          <button onclick="clearConsole()" class="text-xs font-bold text-zinc-300 hover:text-white px-2.5 py-0.5 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 transition-colors">
+            Clear
+          </button>
+        </div>
+        <div id="benchConsole" class="h-28 overflow-y-auto bg-zinc-950 border border-zinc-800/80 rounded-lg p-2.5 font-mono text-[11px] leading-relaxed space-y-0.5 scrollbar-thin text-zinc-200">
+          <div><span class="text-zinc-400 font-bold">[BOOT]</span> ESP32 Espressif32 6.12.0 booted. Normal Mode Active.</div>
+          <div><span class="text-zinc-400 font-bold">[BOOT]</span> DS3231 RTC synced to 2026-09-23 12:30:00.</div>
+          <div><span class="text-zinc-400 font-bold">[BOOT]</span> SD Card initialized (config.json loaded, students.csv 200 records).</div>
+          <div><span class="text-zinc-400 font-bold">[BOOT]</span> SIM800L GSM Network connected (+CSQ: 24,99).</div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: COOLDOWN & TIMING GANTT VISUALIZER -->
+    <!-- ======================================================== -->
+    <main id="tabContentTimeline" class="hidden space-y-5">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-md space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-white">Live Execution Sequence & Cooldown Overlap</h2>
+            <p class="text-xs text-zinc-400">Real-time timeline showing why cooldown does not start at breach time for RFID alarms.</p>
+          </div>
+          <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30" id="liveTimelineNotice">
+            Total Cycle: 15s (5s Bucketing Window + 10s Cooldown Time)
+          </span>
+        </div>
+
+        <!-- Timeline Graphic (0s - 45s) -->
+        <div class="relative pt-6 pb-4">
+          <!-- Time Grid Labels -->
+          <div class="grid grid-cols-9 text-[11px] font-mono text-zinc-400 border-b border-zinc-800 pb-1 mb-4 font-semibold">
+            <span>0s (Breach)</span>
+            <span class="text-center">5s</span>
+            <span class="text-center">10s</span>
+            <span class="text-center">15s</span>
+            <span class="text-center">20s</span>
+            <span class="text-center">25s</span>
+            <span class="text-center">30s</span>
+            <span class="text-center">35s</span>
+            <span class="text-right">40s+</span>
+          </div>
+
+          <!-- Track 1: Bucketing Window (s) -->
+          <div class="space-y-1 mb-3">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="text-purple-400 font-bold">1. Bucketing Window (s) [Groups student accomplice jumpers]</span>
+              <span class="font-mono text-xs text-zinc-300 font-bold" id="lblGanttBucket">0s - 5s</span>
+            </div>
+            <div class="h-6 w-full bg-zinc-950 rounded-lg overflow-hidden relative border border-zinc-800">
+              <div id="barGanttBucket" class="h-full bg-purple-500/80 rounded flex items-center px-2 text-[10px] text-white font-mono font-bold" style="width: 12.5%;">
+                5s Window
+              </div>
+            </div>
+          </div>
+
+          <!-- Track 2: Cooldown Time (s) -->
+          <div class="space-y-1 mb-3">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="text-amber-400 font-bold">2. Cooldown Time (s) [lastAlarmTime &rarr; cooldown re-arm delay]</span>
+              <span class="font-mono text-xs text-zinc-300 font-bold" id="lblGanttCooldown">5s - 15s (Active)</span>
+            </div>
+            <div class="h-6 w-full bg-zinc-950 rounded-lg overflow-hidden relative border border-zinc-800">
+              <div id="barGanttCooldown" class="h-full bg-amber-500/80 rounded flex items-center px-2 text-[10px] text-white font-mono font-bold" style="margin-left: 12.5%; width: 25%;">
+                10s Cooldown
+              </div>
+            </div>
+          </div>
+
+          <!-- Track 3: Alarm Duration (s) -->
+          <div class="space-y-1 mb-3">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="text-red-400 font-bold">3. Alarm Duration (s) [Loudspeaker siren playback runtime]</span>
+              <span class="font-mono text-xs text-zinc-300 font-bold" id="lblGanttSiren">0s - 10s (Audio playing)</span>
+            </div>
+            <div class="h-6 w-full bg-zinc-950 rounded-lg overflow-hidden relative border border-zinc-800">
+              <div id="barGanttSiren" class="h-full bg-red-500/80 rounded flex items-center px-2 text-[10px] text-white font-mono font-bold" style="width: 25%;">
+                10s Siren
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Playhead Needle -->
+          <div id="ganttNeedle" class="absolute top-6 bottom-4 w-0.5 bg-cyan-400 pointer-events-none transition-all duration-75 shadow-[0_0_8px_rgba(34,211,238,0.9)]" style="left: 0%;">
+            <div class="absolute -top-3.5 -translate-x-1/2 bg-cyan-500 text-black text-[9px] font-mono font-bold px-1 rounded" id="ganttNeedleText">0.0s</div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs space-y-2">
+          <div class="font-bold text-blue-400 flex items-center gap-1.5">
+            <span>💡</span> Mathematical Proof for the Students:
+          </div>
+          <p class="text-zinc-200 leading-relaxed font-medium">
+            In <code class="px-1.5 py-0.5 rounded bg-zinc-800 text-blue-300 font-mono">src/main.cpp</code> line 1059, for an identified breach, <code class="text-blue-400 font-bold">lastAlarmTime</code> is stamped when the <strong>Bucketing Window finalizes</strong> (at t = 5s), NOT when the alarm starts! Thus, setting cooldown to 10s creates a <strong>15-second re-arm cycle</strong> (5s bucketing + 10s cooldown) from the initial breach. The siren blares for 10s by default, going silent at t = 10s while cooldown completes at t = 15s.
+          </p>
+        </div>
+      </div>
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: EMBEDDED WEB PORTAL (192.168.4.1) -->
+    <!-- ======================================================== -->
+    <main id="tabContentPortal" class="hidden space-y-5">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-sm space-y-5 max-w-4xl mx-auto">
+        <div class="border-b border-zinc-800 pb-3 flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-bold text-white">Device Configuration Portal</h2>
+            <p class="text-xs text-zinc-400">Gateway IP: <code class="px-1.5 py-0.5 rounded bg-zinc-950 border border-zinc-800 text-blue-300 font-mono">192.168.4.1</code></p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-xs font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">Web Portal Sync</span>
+        </div>
+
+        <!-- Timing Fields -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+          <!-- Cooldown -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-amber-400">Cooldown Time (s)</label>
+            <input type="number" id="portalCooldown" value="10" min="1" max="3600" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-sm font-bold text-white focus:border-amber-400 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Silent period after alarm before re-arming.</p>
+          </div>
+
+          <!-- Alarm Duration -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-red-400">Alarm Duration (s)</label>
+            <input type="number" id="portalAlarmDuration" value="10" min="1" max="600" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-sm font-bold text-white focus:border-red-400 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Siren runtime on DFPlayer Mini & Strobe LED.</p>
+          </div>
+
+          <!-- Bucketing Window -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-purple-400">Bucketing Window (s)</label>
+            <input type="number" id="portalBucketWindow" value="5" min="1" max="60" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-sm font-bold text-white focus:border-purple-400 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Time window to group accomplice jumpers.</p>
+          </div>
+
+          <!-- Breach Memory -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-emerald-400">Breach Memory (s)</label>
+            <input type="number" id="portalBreachMemory" value="5" min="1" max="60" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-sm font-bold text-white focus:border-emerald-400 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Beam trigger memory waiting for card match.</p>
+          </div>
+
+          <!-- RFID Memory -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-blue-400">RFID Memory (s)</label>
+            <input type="number" id="portalTagMemory" value="5" min="1" max="600" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-sm font-bold text-white focus:border-blue-400 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Scanned card retention before climbing beam.</p>
+          </div>
+
+          <!-- Voice Track Selector -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-zinc-300">Alarm Voice Track</label>
+            <select id="portalVoiceTrack" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-white focus:border-blue-400 focus:outline-none">
+              <option value="1">Track 1 - "Please return to class..."</option>
+              <option value="2">Track 2 - "Security alert. You are in a restricted zone..."</option>
+              <option value="3">Track 3 - "Warning. Unauthorized access detected..."</option>
+              <option value="4">Track 4 - "Attention. Climbing fence prohibited..."</option>
+              <option value="5">Track 5 - "Restricted area. CCTV recording..."</option>
+              <option value="6">Track 6 - "Emergency perimeter breach..."</option>
+              <option value="7">Track 7 - Siren / High Decibel 1</option>
+              <option value="8">Track 8 - Siren / Custom Voice 2</option>
+            </select>
+            <p class="text-[10px] text-zinc-400">MP3 track played by DFPlayer Mini.</p>
+          </div>
+
+          <!-- Guard Phone Number -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-blue-400">Recipient Phone Number</label>
+            <input type="text" id="portalGuardPhone" value="+639123456789" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold text-white focus:border-blue-400 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Cellular target for SIM800L SMS alerts.</p>
+          </div>
+
+          <!-- Wall Label -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-zinc-300">Wall Label</label>
+            <input type="text" id="portalWallLabel" value="Wall Section A" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 font-mono text-xs font-bold text-white focus:border-zinc-500 focus:outline-none">
+            <p class="text-[10px] text-zinc-400">Location tag reported in SMS & SD log.</p>
+          </div>
+
+          <!-- Recipient Role -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            <label class="font-bold text-zinc-300">Recipient Role</label>
+            <select id="portalRecipientRole" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs font-semibold text-white focus:border-zinc-500 focus:outline-none">
+              <option value="Guard">Guard (CAMPUS ALERT - SECURITY)</option>
+              <option value="Teacher">Teacher (CAMPUS ALERT - FACULTY)</option>
+            </select>
+            <p class="text-[10px] text-zinc-400">Selects SMS alert banner format.</p>
+          </div>
+
+          <!-- Device Lock Setting -->
+          <div class="space-y-1.5 p-3 rounded-xl bg-zinc-950 border border-red-500/30 sm:col-span-2 md:col-span-3 flex items-center justify-between">
+            <div>
+              <label class="font-bold text-red-400 flex items-center gap-1.5">
+                <span>🔒</span> Device Lock (sysConfig.isLocked)
+              </label>
+              <p class="text-[10px] text-zinc-400">When locked, RFID reading and beam alarm sensing are disabled. Alarms will not sound.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="portalIsLocked" class="sr-only peer">
+              <div class="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap justify-between items-center pt-3 border-t border-zinc-800 gap-2">
+          <button onclick="portalFactoryReset()" class="px-4 py-2 rounded-xl border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-all">
+            ♻️ Factory Reset (Clear EEPROM/SD)
+          </button>
+          <button onclick="savePortalSettings()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all">
+            Save Settings & Sync to ESP32 Memory
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: MICROSD FILES & LOGS -->
+    <!-- ======================================================== -->
+    <main id="tabContentSdcard" class="hidden space-y-5">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex justify-between items-center border-b border-zinc-800 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span>💾</span> MicroSD Card Audit Trail (/eventlog.csv)
+            </h2>
+            <p class="text-xs text-zinc-400 mt-0.5">Appended by loop() on Core 1 under spiMutex.</p>
+          </div>
+          <span class="text-xs font-mono px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 font-bold">FAT32 AUTHORITATIVE</span>
+        </div>
+
+        <!-- Event Log Table -->
+        <div class="overflow-x-auto rounded-xl border border-zinc-800">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-zinc-950 text-zinc-400 border-b border-zinc-800">
+              <tr>
+                <th class="p-3">TIMESTAMP</th>
+                <th class="p-3">EVENT KIND</th>
+                <th class="p-3">WALL / LOCATION</th>
+                <th class="p-3">STUDENT DETAILS / ROSTER</th>
+                <th class="p-3">SEVERITY</th>
+              </tr>
+            </thead>
+            <tbody id="sdLogTableBody" class="divide-y divide-zinc-800 text-zinc-300">
+              <tr>
+                <td class="p-3 text-zinc-500">2026-09-23 12:30:00</td>
+                <td class="p-3 text-blue-400 font-bold">[SYSTEM_BOOT]</td>
+                <td class="p-3">Wall Section A</td>
+                <td class="p-3 text-zinc-400">Node initialized</td>
+                <td class="p-3"><span class="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px]">INFO</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Students Database Table (/students.csv) -->
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex justify-between items-center border-b border-zinc-800 pb-3">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span>👥</span> MicroSD Student Database (/students.csv)
+            </h2>
+            <p class="text-xs text-zinc-400 mt-0.5">Authoritative student records cached to RAM hash table on boot.</p>
+          </div>
+          <span class="text-xs font-mono px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 font-bold">18 REGISTERED STUDENTS</span>
+        </div>
+        <div class="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950 max-h-60 scrollbar-thin">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-zinc-950 text-zinc-400 border-b border-zinc-800 sticky top-0">
+              <tr>
+                <th class="p-2.5">STUDENT ID</th>
+                <th class="p-2.5">FULL NAME</th>
+                <th class="p-2.5">WIEGAND HEX TAG</th>
+                <th class="p-2.5">STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="sdStudentTableBody" class="divide-y divide-zinc-800 text-zinc-300">
+              <!-- Dynamically populated by renderSdStudentsTable() -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- ======================================================== -->
+    <!-- TAB 5: FREERTOS DUAL-CORE ENGINE -->
+    <!-- ======================================================== -->
+    <main id="tabContentRtos" class="hidden space-y-5">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 shadow-sm space-y-5">
+        <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-zinc-800 pb-3">
+          <span>⚙️</span> FreeRTOS Dual-Core Architecture & Queue Engine
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Core 0: SensorTask -->
+          <div class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <span class="font-bold text-xs text-blue-400">CORE 0: sensorTask (Priority 2)</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">ACTIVE</span>
+            </div>
+            <ul class="text-xs space-y-1.5 text-zinc-300 font-mono">
+              <li>• Polling IR Beam (GPIO 14) with 25ms debounce</li>
+              <li>• Wiegand interrupt capture (D0: 21, D1: 22)</li>
+              <li>• RFID pre-breach expiration & bucketing window</li>
+              <li>• Actuates DFPlayer siren & Strobe LED</li>
+              <li>• Enforces waitingForBeamRecovery barrier</li>
+            </ul>
+          </div>
+
+          <!-- Core 1: CommTask & Loop -->
+          <div class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <span class="font-bold text-xs text-purple-400">CORE 1: commTask & loop() (Priority 1)</span>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">ACTIVE</span>
+            </div>
+            <ul class="text-xs space-y-1.5 text-zinc-300 font-mono">
+              <li>• SIM800L non-blocking AT command state machine</li>
+              <li>• Consumes incidentQueue & resolves studentDB</li>
+              <li>• Writes audit entries to SD under spiMutex</li>
+              <li>• Dispatches multi-part SMS to authorized phone</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Live Queue Lengths -->
+        <div class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3 font-mono text-xs">
+          <div class="font-bold text-zinc-100">Live Queue Gauges:</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+              <div class="text-zinc-400">incidentQueue (sensorTask &rarr; loop):</div>
+              <div class="text-emerald-400 font-bold mt-1 text-sm"><span id="txtIncidentQueueLen">0</span> / 10 items</div>
+            </div>
+            <div class="p-3 rounded-lg bg-zinc-900 border border-zinc-800">
+              <div class="text-zinc-400">alarmQueue (loop &rarr; commTask):</div>
+              <div class="text-purple-400 font-bold mt-1 text-sm"><span id="txtAlarmQueueLen">0</span> / 20 items</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- JavaScript Firmware Simulation Engine -->
+  <script>
+    // -------------------------------------------------------------
+    // Web Audio Synthesizer (Exact DFPlayer Siren & Card Reader Beep)
+    // -------------------------------------------------------------
+    let audioCtx = null;
+    let soundEnabled = true;
+    let sirenOsc = null;
+    let sirenGain = null;
+    let sirenInterval = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById("soundIcon").innerText = soundEnabled ? "🔊" : "🔇";
+      document.getElementById("soundLabel").innerText = soundEnabled ? "Synth: On" : "Synth: Off";
+      if (!soundEnabled) stopSirenSound();
+    }
+
+    function playBeep(freq = 2400, duration = 0.08) {
+      if (!soundEnabled) return;
+      initAudio();
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playRelayClick() {
+      if (!soundEnabled) return;
+      playBeep(450, 0.025);
+    }
+
+    function startSirenSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      if (sirenOsc) return;
+
+      try {
+        sirenOsc = audioCtx.createOscillator();
+        sirenGain = audioCtx.createGain();
+        sirenOsc.type = "sawtooth";
+        sirenOsc.frequency.setValueAtTime(650, audioCtx.currentTime);
+        sirenGain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+
+        let ascending = true;
+        sirenInterval = setInterval(() => {
+          if (!sirenOsc || !audioCtx) return;
+          const targetFreq = ascending ? 950 : 550;
+          sirenOsc.frequency.exponentialRampToValueAtTime(targetFreq, audioCtx.currentTime + 0.35);
+          ascending = !ascending;
+        }, 380);
+
+        sirenOsc.connect(sirenGain);
+        sirenGain.connect(audioCtx.destination);
+        sirenOsc.start();
+      } catch (e) {}
+    }
+
+    function stopSirenSound() {
+      if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+      }
+      if (sirenOsc) {
+        try {
+          sirenGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+          sirenOsc.stop(audioCtx.currentTime + 0.06);
+          sirenOsc.disconnect();
+        } catch (e) {}
+        sirenOsc = null;
+        sirenGain = null;
+      }
+    }
+
+    function speakAnnouncement(text) {
+      if (!soundEnabled || !window.speechSynthesis) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1.05;
+        utter.pitch = 0.95;
+        window.speechSynthesis.speak(utter);
+      } catch (e) {}
+    }
+
+    // -------------------------------------------------------------
+    // ESP32 System Variables & Student Database
+    // -------------------------------------------------------------
+    let simMillis = 0; // uint32_t millis()
+    let isPaused = false;
+    let simSpeed = 1;
+
+    // Student Database (studentDB in storage.h & students.csv — 18 Registered Students)
+    const studentDB = {
+      "9A3B5C10": { name: "Juan Dela Cruz", id: "2024-0101", triggerCount: 0 },
+      "7E12F844": { name: "Maria Santos", id: "2024-0102", triggerCount: 0 },
+      "3D99AA05": { name: "Mark Reyes", id: "2024-0103", triggerCount: 0 },
+      "4C811B22": { name: "Chloe Garcia", id: "2024-0104", triggerCount: 0 },
+      "5F229C33": { name: "Angelo Ramos", id: "2024-0105", triggerCount: 0 },
+      "A2D38E44": { name: "Sofia Bautista", id: "2024-0106", triggerCount: 0 },
+      "B3E47F55": { name: "Christian Mendoza", id: "2024-0107", triggerCount: 0 },
+      "C4F56A66": { name: "Beatrice Lopez", id: "2024-0108", triggerCount: 0 },
+      "D5A65B77": { name: "Joshua Gonzales", id: "2024-0109", triggerCount: 0 },
+      "E6B74C88": { name: "Nicole Fernandez", id: "2024-0110", triggerCount: 0 },
+      "F7C83D99": { name: "Daniel Aquino", id: "2024-0111", triggerCount: 0 },
+      "1A2B3C4D": { name: "Alyssa Cruz", id: "2024-0112", triggerCount: 0 },
+      "2B3C4D5E": { name: "Gabriel Torres", id: "2024-0113", triggerCount: 0 },
+      "3C4D5E6F": { name: "Samantha Villanueva", id: "2024-0114", triggerCount: 0 },
+      "4D5E6F70": { name: "Matthew David", id: "2024-0115", triggerCount: 0 },
+      "5E6F7081": { name: "Jasmine Castillo", id: "2024-0116", triggerCount: 0 },
+      "6F708192": { name: "Kevin Alcantara", id: "2024-0117", triggerCount: 0 },
+      "708192A3": { name: "Patricia Ocampo", id: "2024-0118", triggerCount: 0 }
+    };
+    let unregTriggers = 0;
+
+    function renderStudentCards(searchTerm = "") {
+      const container = document.getElementById("studentCardsGrid");
+      if (!container) return;
+      const term = searchTerm.trim().toLowerCase();
+      let html = "";
+
+      for (const [tag, s] of Object.entries(studentDB)) {
+        if (term && !s.name.toLowerCase().includes(term) && !s.id.toLowerCase().includes(term) && !tag.toLowerCase().includes(term)) {
+          continue;
+        }
+        html += `
+          <button onclick="tapCard('${tag}', '${s.name.replace(/'/g, "\\'")}', '${s.id}')" class="px-2.5 py-1.5 rounded-lg border border-zinc-800 hover:border-blue-500/80 bg-zinc-950 hover:bg-blue-950/30 text-left transition-all active:scale-95 group relative shadow-sm flex flex-col justify-between h-[56px] overflow-hidden">
+            <div class="flex items-center justify-between text-[11px] font-mono leading-none">
+              <span class="text-blue-400 font-bold">${s.id}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700/70 font-mono font-bold">Hits: <strong id="cnt_${tag}" class="text-blue-400">${s.triggerCount}</strong></span>
+            </div>
+            <div class="font-bold text-xs text-white group-hover:text-blue-300 truncate leading-tight mt-0.5" title="${s.name}">${s.name}</div>
+            <div class="text-[10px] font-mono text-zinc-400 leading-none truncate font-medium">HEX: ${tag}</div>
+          </button>
+        `;
+      }
+
+      if (!term || "unregistered".includes(term) || "unknown".includes(term) || "f055cd91".includes(term)) {
+        html += `
+          <button onclick="tapCard('F055CD91', 'Unregistered Student', 'F055CD91')" class="px-2.5 py-1.5 rounded-lg border border-amber-500/40 hover:border-amber-500 bg-amber-500/10 text-left transition-all active:scale-95 group relative shadow-sm flex flex-col justify-between h-[56px] overflow-hidden">
+            <div class="flex items-center justify-between text-[11px] font-mono leading-none">
+              <span class="text-amber-400 font-bold">UNKNOWN</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/40 font-mono font-bold">Hits: <strong id="cnt_F055CD91" class="text-amber-300">${unregTriggers}</strong></span>
+            </div>
+            <div class="font-bold text-xs text-amber-300 group-hover:text-amber-200 truncate leading-tight mt-0.5" title="Unregistered Card">Unregistered Card</div>
+            <div class="text-[10px] font-mono text-amber-300/80 leading-none truncate font-medium">HEX: F055CD91</div>
+          </button>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function filterStudentCards(val) {
+      renderStudentCards(val);
+    }
+
+    function renderSdStudentsTable() {
+      const tbody = document.getElementById("sdStudentTableBody");
+      if (!tbody) return;
+      let html = "";
+      for (const [tag, s] of Object.entries(studentDB)) {
+        html += `
+          <tr class="hover:bg-zinc-800/30 transition-colors">
+            <td class="p-2.5 font-bold text-blue-400">${s.id}</td>
+            <td class="p-2.5 text-zinc-200">${s.name}</td>
+            <td class="p-2.5 font-mono text-zinc-400">${tag}</td>
+            <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">ACTIVE</span></td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = html;
+    }
+
+    // SystemConfig (storage.h)
+    let sysConfig = {
+      cooldown: 10000,           // in ms (10s)
+      alarmDuration: 10000,      // in ms (10s)
+      bucketWindowMs: 5000,      // in ms (5s)
+      breachMemoryMs: 5000,      // in ms (5s)
+      tagMemoryMs: 5000,         // in ms (5s)
+      persistentBeamAlertMs: 900000, // 15 mins (900000 ms)
+      maxBucketDurationMs: 180000, // 3 mins (180000 ms)
+      alarmVoice: 1,
+      guardPhone: "+639123456789",
+      wallLabel: "Wall Section A",
+      locationDesc: "Main Building - Perimeter Wall",
+      recipientRole: "Guard",
+      isLocked: false            // Device lock state (sysConfig.isLocked)
+    };
+
+    // Modes: 0 = MODE_NORMAL, 1 = MODE_CONFIG
+    const MODE_NORMAL = 0;
+    const MODE_CONFIG = 1;
+    let currentMode = MODE_NORMAL;
+    let rfidQuarantineUntil = 0;
+
+    // Sensor & Incident State Variables (strictly mirroring src/main.cpp sensorTask)
+    let currentIRState = false; // checkIRBeam() pin state
+    let isHoldObstruction = false;
+    let waitingForBeamRecovery = false;
+    let breachRemembered = false;
+    let lastBreachAt = 0;
+    let lastAlarmTime = 0;
+    let alarmActive = false;
+    let alarmStartTime = 0;
+    let beamEpisodeActive = false;
+    let beamBrokenSince = 0;
+    let beamRecoveryTiming = false;
+    let beamRecoveryStartedAt = 0;
+    let beamNotificationQueued = false;
+    let irBeamBreakLatched = false;
+    let irHighSince = 0;
+    let irConfirmedHigh = false;
+    let irQuietUntil = 0;
+    let freshRFIDCanArmBrokenBeam = true;
+    let wasLocked = false;
+    let freshRFIDScannedThisIteration = false;
+    const BEAM_RECOVERY_CONFIRM_MS = 500;
+
+    // RFIDBucket State (mirroring include/rfid_bucket.h)
+    let rfidBucket = {
+      eventActive: false,
+      eventOpenedAt: 0,
+      eventLastUniqueTagAt: 0,
+      lastPreBreachActivityAt: 0,
+      tags: [] // unique array of tag strings
+    };
+
+    // Queues
+    let incidentQueue = [];
+    let alarmQueue = [];
+    let modemState = "IDLE";
+    let smsInFlight = null;
+    let smsStateTimer = 0;
+
+    const VOICE_TRACKS = {
+      1: "Please return to class. Climbing the fence is prohibited.",
+      2: "Security alert. You are in a restricted perimeter zone.",
+      3: "Warning. Unauthorized access detected.",
+      4: "Attention. Climbing the fence is prohibited.",
+      5: "This is a restricted area. CCTV recording is in progress.",
+      6: "Emergency alert. Perimeter breach detected.",
+      7: "Siren / High-Decibel Loud Alarm 1",
+      8: "Siren / Custom Voice 2"
+    };
+
+    function logConsole(tag, msg, color = "text-zinc-300") {
+      const consoleEl = document.getElementById("benchConsole");
+      const line = document.createElement("div");
+      const sec = (simMillis / 1000).toFixed(1);
+      line.innerHTML = `<span class="text-zinc-500 font-mono">[${sec}s]</span> <span class="font-semibold text-blue-400">[${tag}]</span> <span class="${color}">${msg}</span>`;
+      consoleEl.appendChild(line);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    function clearConsole() {
+      document.getElementById("benchConsole").innerHTML = "";
+    }
+
+    // Tab Navigation
+    function switchTab(t) {
+      document.querySelectorAll(".tab-nav").forEach(b => {
+        b.classList.remove("border-blue-500", "text-blue-400", "bg-zinc-900", "font-bold");
+        b.classList.add("border-transparent", "text-zinc-400");
+      });
+      document.getElementById("tabContentBench").classList.add("hidden");
+      document.getElementById("tabContentTimeline").classList.add("hidden");
+      document.getElementById("tabContentPortal").classList.add("hidden");
+      document.getElementById("tabContentSdcard").classList.add("hidden");
+      document.getElementById("tabContentRtos").classList.add("hidden");
+
+      const activateBtn = (id) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          btn.classList.remove("border-transparent", "text-zinc-400");
+          btn.classList.add("border-blue-500", "text-blue-400", "bg-zinc-900", "font-bold");
+        }
+      };
+
+      if (t === "bench") {
+        activateBtn("tabBtnBench");
+        document.getElementById("tabContentBench").classList.remove("hidden");
+      } else if (t === "timeline") {
+        activateBtn("tabBtnTimeline");
+        document.getElementById("tabContentTimeline").classList.remove("hidden");
+      } else if (t === "portal") {
+        activateBtn("tabBtnPortal");
+        document.getElementById("tabContentPortal").classList.remove("hidden");
+      } else if (t === "sdcard") {
+        activateBtn("tabBtnSdcard");
+        document.getElementById("tabContentSdcard").classList.remove("hidden");
+      } else if (t === "rtos") {
+        activateBtn("tabBtnRtos");
+        document.getElementById("tabContentRtos").classList.remove("hidden");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Physical Sensor Triggers (Wiegand & IR Beam)
+    // -------------------------------------------------------------
+
+    function tapCard(tagID, studentName, studentID) {
+      if (sysConfig.isLocked) {
+        logConsole("RFID", "Card tap rejected: Device is LOCKED (sysConfig.isLocked == true).", "text-red-400 font-semibold");
+        return;
+      }
+
+      if (simMillis < rfidQuarantineUntil) {
+        logConsole("RFID", `Card tap ignored: reader is in post-transition quarantine (${rfidQuarantineUntil - simMillis}ms remaining).`, "text-zinc-500");
+        return;
+      }
+
+      freshRFIDScannedThisIteration = true;
+      playBeep(2600, 0.06);
+
+      // Reader LED Green flash
+      const led = document.getElementById("rfidReaderBuzzer");
+      led.className = "w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,1)] transition-all";
+      setTimeout(() => {
+        led.className = "w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] transition-all";
+      }, 350);
+
+      if (currentMode === MODE_CONFIG) {
+        logConsole("MODE", `Administrative scan in MODE_CONFIG: Tag #${tagID} (${studentName}). Alarms suppressed.`, "text-amber-400 font-bold");
+        return;
+      }
+
+      // Check if tag is already buffered
+      if (!rfidBucket.tags.includes(tagID)) {
+        rfidBucket.tags.push(tagID);
+      }
+      rfidBucket.lastPreBreachActivityAt = simMillis;
+
+      if (rfidBucket.eventActive) {
+        rfidBucket.eventLastUniqueTagAt = simMillis;
+        logConsole("RFID", `Tag scanned into ACTIVE incident: ${studentName} (${tagID}). Bucket timer extended by ${sysConfig.bucketWindowMs / 1000}s.`, "text-purple-400 font-bold");
+      } else {
+        logConsole("RFID", `Card scanned: ${studentName} [${studentID}] (Tag: ${tagID}). Buffered in pre-breach memory (retained for ${sysConfig.tagMemoryMs / 1000}s).`, "text-cyan-400");
+      }
+    }
+
+    function triggerJumpWallPulse() {
+      currentIRState = true;
+      irBeamBreakLatched = true; // ISR latching (IRAM_ATTR handleIRBeamBreak)
+      playRelayClick();
+
+      const cross = document.getElementById("fenceCrossAnim");
+      cross.style.transform = "translateY(-18px) scale(1.15)";
+      setTimeout(() => {
+        cross.style.transform = "translateY(0) scale(1)";
+        if (!isHoldObstruction) {
+          currentIRState = false;
+        }
+      }, 400);
+    }
+
+    function toggleHoldObstruction() {
+      isHoldObstruction = !isHoldObstruction;
+      currentIRState = isHoldObstruction;
+      if (isHoldObstruction) irBeamBreakLatched = true;
+      const btn = document.getElementById("btnHoldObstruction");
+      const txt = document.getElementById("txtHoldObstruction");
+
+      if (isHoldObstruction) {
+        btn.classList.add("bg-red-900/60", "border-red-500", "text-red-200");
+        txt.innerText = "Release Obstruction";
+        logConsole("IR", "Infrared beam is continuously OBSTRUCTED.", "text-red-400");
+      } else {
+        btn.classList.remove("bg-red-900/60", "border-red-500", "text-red-200");
+        txt.innerText = "Hold Obstruction (Continuous)";
+        logConsole("IR", "Infrared beam obstruction CLEARED.", "text-emerald-400");
+      }
+    }
+
+    // -------------------------------------------------------------
+    // FreeRTOS sensorTask Execution Loop (Core 0)
+    // -------------------------------------------------------------
+
+    function sensorTaskTick(dtMs) {
+      const now = simMillis;
+
+      // 1. Beam Episode & Recovery Monitoring (main.cpp L714-L735)
+      if (currentIRState) {
+        beamRecoveryTiming = false;
+        if (!beamEpisodeActive) {
+          beamEpisodeActive = true;
+          beamNotificationQueued = false;
+          beamBrokenSince = now;
+          logConsole("IR", "Beam break episode started; alarm LED will remain on until recovery.", "text-amber-400");
+        }
+      } else if (beamEpisodeActive) {
+        if (!beamRecoveryTiming) {
+          beamRecoveryTiming = true;
+          beamRecoveryStartedAt = now;
+        } else if (now - beamRecoveryStartedAt >= BEAM_RECOVERY_CONFIRM_MS) {
+          const episodeDuration = (now - beamBrokenSince) / 1000;
+          beamEpisodeActive = false;
+          beamRecoveryTiming = false;
+          beamNotificationQueued = false; // Reset persistent notification latch
+          logConsole("IR", `Beam recovered after ${episodeDuration.toFixed(1)}s; notification latch reset.`, "text-emerald-400");
+        }
+      }
+
+      // 2. Persistent Beam Obstruction Alert (main.cpp L741-L760)
+      if (currentIRState && beamEpisodeActive && !beamNotificationQueued &&
+          !sysConfig.isLocked && currentMode === MODE_NORMAL &&
+          (now - beamBrokenSince >= sysConfig.persistentBeamAlertMs)) {
+        beamNotificationQueued = true;
+        dispatchIncident("PersistentBeam", []);
+        logConsole("SMS", `[SMS] Persistent beam alert queued once for this break episode (${sysConfig.persistentBeamAlertMs / 60000}m continuous).`, "text-red-500 font-bold");
+      }
+
+      // 3. Device Lock Handling (main.cpp L762-L789)
+      if (sysConfig.isLocked) {
+        if (!wasLocked) {
+          rfidBucket.eventActive = false;
+          rfidBucket.tags = [];
+          wasLocked = true;
+          logConsole("RFID", "[RFID] Reader association state cleared because the device is locked.", "text-red-400 font-bold");
+        }
+        breachRemembered = false;
+        waitingForBeamRecovery = true;
+        irBeamBreakLatched = false;
+        return;
+      }
+      if (wasLocked) {
+        wasLocked = false;
+        rfidQuarantineUntil = now + 75;
+        irQuietUntil = now + 75;
+        rfidBucket.tags = [];
+        logConsole("RFID", "[RFID] Device unlocked. 75ms reader quarantine initialized.", "text-emerald-400 font-bold");
+      }
+
+      // 4. Mode Quarantine check
+      if (currentMode === MODE_CONFIG) {
+        breachRemembered = false;
+        waitingForBeamRecovery = true;
+        irBeamBreakLatched = false;
+        return;
+      }
+
+      // 5. waitingForBeamRecovery gate (main.cpp L894-L923)
+      if (waitingForBeamRecovery) {
+        irBeamBreakLatched = false;
+        if (!currentIRState) {
+          waitingForBeamRecovery = false;
+          freshRFIDCanArmBrokenBeam = false;
+          logConsole("IR", "Beam cleared to normal (LOW). waitingForBeamRecovery unlatched.", "text-emerald-400");
+        } else if (freshRFIDScannedThisIteration && freshRFIDCanArmBrokenBeam) {
+          if (beamEpisodeActive && (now - beamBrokenSince >= BEAM_RECOVERY_CONFIRM_MS)) {
+            logConsole("IR", "[IR] Persistent beam obstruction active; fresh RFID scan buffered but will not arm breach without beam cycle.", "text-amber-400");
+            freshRFIDCanArmBrokenBeam = false;
+          } else {
+            waitingForBeamRecovery = false;
+            freshRFIDCanArmBrokenBeam = false;
+            lastBreachAt = now;
+            breachRemembered = true;
+            logConsole("IR", "[IR] Beam remains broken after transition; fresh RFID evidence armed the incident.", "text-cyan-400 font-bold");
+          }
+        }
+      }
+      freshRFIDScannedThisIteration = false;
+
+      // 6. Latched IR Break & 20ms Debounce (main.cpp L925-L947)
+      const latchedIRBreak = irBeamBreakLatched;
+      irBeamBreakLatched = false;
+      let irBreakCandidate = false;
+      if (now >= irQuietUntil) {
+        irBreakCandidate = currentIRState || latchedIRBreak;
+      }
+      if (irBreakCandidate) {
+        if (irHighSince === 0) irHighSince = now;
+        if (now - irHighSince >= 20) {
+          irConfirmedHigh = true;
+        }
+      } else {
+        irHighSince = 0;
+        irConfirmedHigh = false;
+      }
+
+      const irBreakDetected = irConfirmedHigh;
+      if (irBreakDetected && !waitingForBeamRecovery) {
+        lastBreachAt = now;
+        breachRemembered = true;
+      }
+
+      // 7. Pre-breach RFID session expiration (rfid_bucket.h L80-L85)
+      if (!rfidBucket.eventActive && rfidBucket.tags.length > 0) {
+        if (now - rfidBucket.lastPreBreachActivityAt > sysConfig.tagMemoryMs) {
+          rfidBucket.tags = [];
+          logConsole("RFID", `[RFID] Pre-breach scan session expired after ${sysConfig.tagMemoryMs / 1000}s idle. Card buffer reset.`, "text-zinc-500");
+        }
+      }
+
+      // 8. Breach Memory Expiration (main.cpp L948-L951)
+      if (breachRemembered && (now - lastBreachAt > sysConfig.breachMemoryMs)) {
+        breachRemembered = false;
+      }
+
+      // 9. Cooldown Evaluation (main.cpp L953-L960)
+      const cooldownComplete = (lastAlarmTime === 0) || ((now - lastAlarmTime) > sysConfig.cooldown);
+      if (!cooldownComplete && breachRemembered) {
+        // Pulses occurring wholly inside cooldown are consumed, not deferred
+        breachRemembered = false;
+        const remainSec = ((sysConfig.cooldown - (now - lastAlarmTime)) / 1000).toFixed(1);
+        logConsole("SYS", `Breach rejected: System in cooldown (${remainSec}s remaining). Pulse consumed.`, "text-amber-500 font-semibold");
+      }
+
+      // 10. Alarm Triggering Decision (main.cpp L962-L1031)
+      if (breachRemembered && cooldownComplete && currentMode === MODE_NORMAL) {
+        if (!rfidBucket.eventActive) {
+          if (rfidBucket.tags.length > 0) {
+            // Identified breach: Card + Beam
+            rfidBucket.eventActive = true;
+            rfidBucket.eventOpenedAt = now;
+            rfidBucket.eventLastUniqueTagAt = now;
+
+            startLocalAlarm();
+            logConsole("SYS", `Identified breach! Alarm siren sounding. Bucketing unique tags for ${sysConfig.bucketWindowMs / 1000}s (max limit: ${sysConfig.maxBucketDurationMs / 1000}s)...`, "text-red-400 font-bold");
+          } else {
+            // Unidentified breach: wait for breachMemory grace period
+            const gracePeriodMs = (sysConfig.breachMemoryMs > 50) ? (sysConfig.breachMemoryMs - 50) : 0;
+            if (now - lastBreachAt >= gracePeriodMs) {
+              startLocalAlarm();
+              lastAlarmTime = now; // Stamped immediately for unidentified breach!
+              breachRemembered = false;
+              waitingForBeamRecovery = true;
+
+              dispatchIncident("UnidentifiedBreach", []);
+              logConsole("SYS", `Unidentified beam breach triggered alarm! Cooldown (${sysConfig.cooldown / 1000}s) starts NOW!`, "text-red-500 font-bold");
+            }
+          }
+        }
+      }
+
+      // 11. Bucketing Window Evaluation (rfid_bucket.h L93-L105)
+      if (rfidBucket.eventActive) {
+        const idleElapsed = now - rfidBucket.eventLastUniqueTagAt;
+        const hardElapsed = now - rfidBucket.eventOpenedAt;
+
+        let finalized = false;
+        if (hardElapsed >= sysConfig.maxBucketDurationMs) {
+          logConsole("WARN", "RFID bucket reached hard collection limit; finalizing event.", "text-amber-400");
+          finalized = true;
+        } else if (idleElapsed >= sysConfig.bucketWindowMs) {
+          finalized = true;
+        }
+
+        if (finalized) {
+          rfidBucket.eventActive = false;
+          lastAlarmTime = now; // Stamped when bucketing window closes!
+          breachRemembered = false;
+          waitingForBeamRecovery = true;
+
+          const collectedTags = [...rfidBucket.tags];
+          rfidBucket.tags = [];
+
+          dispatchIncident("Incident", collectedTags);
+          logConsole("SYS", `Bucketing window closed! lastAlarmTime set to ${(now / 1000).toFixed(1)}s. Cooldown (${sysConfig.cooldown / 1000}s) starts NOW!`, "text-purple-400 font-bold");
+        }
+      }
+
+      // 12. Local Siren Termination (main.cpp L2053-L2064)
+      if (alarmActive) {
+        if (now - alarmStartTime >= sysConfig.alarmDuration) {
+          alarmActive = false;
+          stopSirenSound();
+          logConsole("AUDIO", `Alarm duration (${sysConfig.alarmDuration / 1000}s) reached. Audio siren stopped.`, "text-zinc-400");
+        }
+      }
+    }
+
+    function startLocalAlarm() {
+      alarmActive = true;
+      alarmStartTime = simMillis;
+      startSirenSound();
+
+      const trackText = VOICE_TRACKS[sysConfig.alarmVoice] || "Warning. Perimeter breach detected.";
+      speakAnnouncement(trackText);
+    }
+
+    // -------------------------------------------------------------
+    // Core 1: loop() & commTask Worker
+    // -------------------------------------------------------------
+
+    function dispatchIncident(kind, tags) {
+      incidentQueue.push({
+        kind,
+        tags,
+        queuedAtMs: simMillis,
+        wall: sysConfig.wallLabel,
+        location: sysConfig.locationDesc
+      });
+
+      // Core 1 loop() takes incidentQueue item and logs to SD + pushes to alarmQueue
+      setTimeout(() => {
+        if (incidentQueue.length > 0) {
+          const item = incidentQueue.shift();
+          alarmQueue.push(item);
+          writeVirtualSDLog(item);
+        }
+      }, 100);
+    }
+
+    function writeVirtualSDLog(item) {
+      const tbody = document.getElementById("sdLogTableBody");
+      const row = document.createElement("tr");
+      const timeStr = "2026-09-23 " + formatClock(simMillis);
+
+      let details = "";
+      if (item.kind === "UnidentifiedBreach") {
+        details = "Unidentified crossing (no RFID tag)";
+      } else if (item.kind === "PersistentBeam") {
+        details = "IR beam obstruction timeout warning";
+      } else {
+        details = item.tags.map(tagID => {
+          const s = studentDB[tagID];
+          if (s) {
+            s.triggerCount++;
+            updateStudentCounters();
+            return `${s.name} (${s.id})`;
+          }
+          unregTriggers++;
+          updateStudentCounters();
+          return `Unregistered (${tagID})`;
+        }).join("; ");
+      }
+
+      const severityBadge = item.kind === "UnidentifiedBreach"
+        ? '<span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold">CRITICAL (3)</span>'
+        : (item.kind === "PersistentBeam"
+          ? '<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold">WARNING (2)</span>'
+          : '<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-bold">INCIDENT (1)</span>');
+
+      row.innerHTML = `
+        <td class="p-3 text-zinc-400">${timeStr}</td>
+        <td class="p-3 text-purple-400 font-semibold">[${item.kind}]</td>
+        <td class="p-3">${item.wall}</td>
+        <td class="p-3 text-emerald-400">${details}</td>
+        <td class="p-3">${severityBadge}</td>
+      `;
+      tbody.prepend(row);
+      logConsole("SD", `Audit row written to /eventlog.csv. Pushed to alarmQueue.`, "text-emerald-400");
+    }
+
+    function updateStudentCounters() {
+      for (const [tag, s] of Object.entries(studentDB)) {
+        const el = document.getElementById(`cnt_${tag}`);
+        if (el) el.innerText = s.triggerCount;
+      }
+      const unregEl = document.getElementById("cnt_F055CD91");
+      if (unregEl) unregEl.innerText = unregTriggers;
+
+      // Backwards compatibility with static IDs if any
+      if (studentDB["9A3B5C10"] && document.getElementById("cntJuan")) document.getElementById("cntJuan").innerText = studentDB["9A3B5C10"].triggerCount;
+      if (studentDB["7E12F844"] && document.getElementById("cntMaria")) document.getElementById("cntMaria").innerText = studentDB["7E12F844"].triggerCount;
+      if (studentDB["3D99AA05"] && document.getElementById("cntMark")) document.getElementById("cntMark").innerText = studentDB["3D99AA05"].triggerCount;
+    }
+
+    // SIM800L Modem Task (commTask on Core 1)
+    function commTaskTick(dtMs) {
+      if (!smsInFlight && alarmQueue.length > 0) {
+        smsInFlight = alarmQueue.shift();
+        smsStateTimer = 0;
+        modemState = "AT+CMGS (Waiting >)";
+        logConsole("SMS", `commTask: AT+CMGS="${sysConfig.guardPhone}" dispatched to modem...`, "text-yellow-400 font-bold");
+      }
+
+      if (smsInFlight) {
+        smsStateTimer += dtMs;
+        if (smsStateTimer >= 1500) { // 1.5s simulated modem transit
+          deliverSmsToPhone(smsInFlight);
+          logConsole("SMS", `commTask: SMS sent (+CMGS: 42). Delivery completed.`, "text-emerald-400");
+          smsInFlight = null;
+          modemState = "IDLE";
+        }
+      }
+    }
+
+    function deliverSmsToPhone(item) {
+      const container = document.getElementById("phoneSmsThread");
+      const phone = document.getElementById("guardPhoneBody");
+
+      phone.classList.add("phone-alert");
+      setTimeout(() => phone.classList.remove("phone-alert"), 1000);
+      playBeep(1800, 0.15);
+
+      const div = document.createElement("div");
+      const timeStr = formatClock(simMillis);
+
+      if (item.kind === "SystemReply") {
+        div.className = "bg-zinc-900 border border-emerald-500/40 rounded-2xl p-3 text-zinc-200 space-y-1 shadow-md";
+        div.innerHTML = `
+          <div class="flex justify-between text-[10px] text-emerald-400 font-mono font-bold">
+            <span>[SIM800L SYSTEM ACK]</span>
+            <span>${timeStr}</span>
+          </div>
+          <p class="text-xs font-mono font-bold text-emerald-300">${item.text}</p>
+        `;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return;
+      }
+
+      div.className = "bg-blue-900/40 border border-blue-500/40 rounded-2xl p-3 text-white space-y-1.5 shadow-md";
+      const headerRole = sysConfig.recipientRole === "Teacher" ? "CAMPUS ALERT - FACULTY" : "CAMPUS ALERT - SECURITY";
+
+      if (item.kind === "UnidentifiedBreach") {
+        div.innerHTML = `
+          <div class="flex justify-between text-[10px] text-red-400 font-mono font-bold">
+            <span>[${headerRole}]</span>
+            <span>${timeStr}</span>
+          </div>
+          <p class="text-xs font-bold text-red-300">
+            CRITICAL ALERT: An unidentified crossing was detected at ${item.wall}!
+          </p>
+          <p class="text-[11px] text-zinc-300">
+            Location: ${item.location}<br>
+            No valid RFID tag was associated with this beam breach. Immediate investigation is required.
+          </p>
+        `;
+      } else if (item.kind === "PersistentBeam") {
+        div.innerHTML = `
+          <div class="flex justify-between text-[10px] text-amber-400 font-mono font-bold">
+            <span>[${headerRole}]</span>
+            <span>${timeStr}</span>
+          </div>
+          <p class="text-xs font-bold text-amber-300">
+            IR BEAM WARNING: The beam at ${item.wall} has remained continuously broken!
+          </p>
+          <p class="text-[11px] text-zinc-300">
+            Location: ${item.location}<br>
+            Check for an obstruction, alignment issue, or tampering.
+          </p>
+        `;
+      } else {
+        let roster = "";
+        item.tags.forEach(t => {
+          const s = studentDB[t];
+          roster += s ? `\n• (${s.id}) ${s.name}` : `\n• (NO-ID) Unregistered (${t})`;
+        });
+
+        div.innerHTML = `
+          <div class="flex justify-between text-[10px] text-blue-400 font-mono font-bold">
+            <span>[${headerRole}]</span>
+            <span>${timeStr}</span>
+          </div>
+          <p class="text-xs font-bold text-white">
+            ALERT: ${item.tags.length} Student(s) caught!
+          </p>
+          <p class="text-[11px] text-zinc-300 leading-relaxed">
+            Location: ${item.location}<br>
+            <strong class="text-zinc-200">ID Nos. Detected:</strong><br>
+            <span class="text-emerald-400 whitespace-pre-line">${roster || "None"}</span>
+          </p>
+        `;
+      }
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function sendPhoneSMS(cmd) {
+      if (!cmd) return;
+      const container = document.getElementById("phoneSmsThread");
+      const timeStr = formatClock(simMillis);
+
+      // Render outgoing message bubble from guard
+      const outDiv = document.createElement("div");
+      outDiv.className = "bg-blue-600 rounded-2xl p-2.5 text-white text-xs max-w-[85%] ml-auto font-mono shadow-sm";
+      outDiv.innerHTML = `<div class="text-[9px] text-blue-200 text-right mb-0.5">Me (${sysConfig.guardPhone}) • ${timeStr}</div><div>${cmd}</div>`;
+      container.appendChild(outDiv);
+      container.scrollTop = container.scrollHeight;
+
+      logConsole("SMS", `Incoming unsolicited SMS (+CMT) from ${sysConfig.guardPhone}: "${cmd}"`, "text-yellow-400 font-bold");
+
+      const cleanCmd = cmd.trim().toUpperCase();
+      setTimeout(() => {
+        if (cleanCmd === "LOCK DEVICE") {
+          sysConfig.isLocked = true;
+          const chk = document.getElementById("portalIsLocked");
+          if (chk) chk.checked = true;
+          logConsole("SMS", "[SMS] Authorized lock command persisted. Device locked.", "text-red-400 font-bold");
+          deliverSmsToPhone({ kind: "SystemReply", text: "OK: Device locked. Alarms disabled." });
+        } else if (cleanCmd === "UNLOCK DEVICE") {
+          sysConfig.isLocked = false;
+          const chk = document.getElementById("portalIsLocked");
+          if (chk) chk.checked = false;
+          rfidQuarantineUntil = simMillis + 75;
+          irQuietUntil = simMillis + 75;
+          logConsole("SMS", "[SMS] Authorized unlock command persisted. Device unlocked.", "text-emerald-400 font-bold");
+          deliverSmsToPhone({ kind: "SystemReply", text: "OK: Device unlocked. Security monitoring active." });
+        } else if (cleanCmd === "AP ON") {
+          currentMode = MODE_CONFIG;
+          document.getElementById("txtSystemMode").innerText = "MODE_CONFIG (AP Portal)";
+          document.getElementById("txtSystemMode").className = "text-xs font-mono font-bold text-amber-400";
+          document.getElementById("lampStatusLed").className = "w-5 h-5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse";
+          logConsole("SMS", "[SMS] Authorized command: Captive Portal AP enabled.", "text-blue-400 font-bold");
+          deliverSmsToPhone({ kind: "SystemReply", text: "OK: AP enabled (SSID: ESP32-Security, IP: 192.168.4.1)." });
+        } else if (cleanCmd === "AP OFF") {
+          currentMode = MODE_NORMAL;
+          rfidQuarantineUntil = simMillis + 75;
+          irQuietUntil = simMillis + 75;
+          document.getElementById("txtSystemMode").innerText = "MODE_NORMAL";
+          document.getElementById("txtSystemMode").className = "text-xs font-mono font-bold text-emerald-400";
+          document.getElementById("lampStatusLed").className = "w-5 h-5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse";
+          logConsole("SMS", "[SMS] Authorized command: Captive Portal AP disabled. Returned to Normal Mode.", "text-emerald-400 font-bold");
+          deliverSmsToPhone({ kind: "SystemReply", text: "OK: AP disabled. Monitoring re-armed." });
+        } else if (cleanCmd === "RESTORE FACTORY SETTINGS") {
+          logConsole("SMS", "[SMS] Authorized command: Executing factory reset at incident boundary.", "text-red-500 font-bold");
+          resetFullSystem();
+          deliverSmsToPhone({ kind: "SystemReply", text: "OK: Factory reset complete. Rebooted to default config." });
+        } else {
+          logConsole("SMS", `[SMS] Unknown command from ${sysConfig.guardPhone}: "${cmd}"`, "text-zinc-500");
+          deliverSmsToPhone({ kind: "SystemReply", text: "ERROR: Unknown command. Supported: LOCK DEVICE, UNLOCK DEVICE, AP ON, AP OFF, RESTORE FACTORY SETTINGS." });
+        }
+      }, 500);
+    }
+
+    function sendPhoneSmsCustom() {
+      const input = document.getElementById("phoneSmsInput");
+      const val = input.value.trim();
+      if (!val) return;
+      input.value = "";
+      sendPhoneSMS(val);
+    }
+
+    function formatClock(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const minutes = 30 + Math.floor(totalSec / 60);
+      const seconds = totalSec % 60;
+      return `12:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // -------------------------------------------------------------
+    // Physical Mode Button (Hold 3s to toggle MODE_NORMAL/CONFIG)
+    // -------------------------------------------------------------
+    let modeHoldTimer = null;
+    let modeHoldStart = 0;
+
+    function startModeButtonHold() {
+      modeHoldStart = Date.now();
+      document.getElementById("txtModeHoldLabel").innerText = "Holding... (Keep pressed)";
+      modeHoldTimer = setTimeout(() => {
+        if (currentMode === MODE_NORMAL) {
+          currentMode = MODE_CONFIG;
+          rfidBucket.eventActive = false;
+          rfidBucket.tags = [];
+          breachRemembered = false;
+          waitingForBeamRecovery = true;
+          rfidQuarantineUntil = simMillis + 75; // 75ms quarantine (RFID_READER_QUARANTINE_MS)
+
+          document.getElementById("txtSystemMode").innerText = "MODE_CONFIG (AP Portal)";
+          document.getElementById("txtSystemMode").className = "text-xs font-mono font-bold text-amber-400";
+          document.getElementById("lampStatusLed").className = "w-5 h-5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse";
+          logConsole("MODE", "Mode button held 3s. Switched to MODE_CONFIG. Alarms suppressed. Portal AP active.", "text-amber-400 font-bold");
+        } else {
+          currentMode = MODE_NORMAL;
+          waitingForBeamRecovery = true;
+          rfidQuarantineUntil = simMillis + 75;
+
+          document.getElementById("txtSystemMode").innerText = "MODE_NORMAL";
+          document.getElementById("txtSystemMode").className = "text-xs font-mono font-bold text-emerald-400";
+          document.getElementById("lampStatusLed").className = "w-5 h-5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse";
+          logConsole("MODE", "Mode button held 3s. Switched to MODE_NORMAL. Security monitoring active.", "text-emerald-400 font-bold");
+        }
+        document.getElementById("txtModeHoldLabel").innerText = "Hold Mode Btn (3s)";
+        modeHoldTimer = null;
+      }, 3000);
+    }
+
+    function abortModeButtonHold() {
+      if (modeHoldTimer) {
+        clearTimeout(modeHoldTimer);
+        modeHoldTimer = null;
+        document.getElementById("txtModeHoldLabel").innerText = "Hold Mode Btn (3s)";
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Hardware UI Refresher & Gantt Sync
+    // -------------------------------------------------------------
+    function updateHardwareUI() {
+      // -----------------------------------------------------------
+      // 1. TOP TIMERS & ENGINE HUD SYNCHRONIZATION
+      // -----------------------------------------------------------
+      // 1.1 Master Simulation Clock
+      const curSec = (simMillis / 1000).toFixed(1);
+      const clockVal = document.getElementById("hudClockVal");
+      const clockSub = document.getElementById("hudClockSub");
+      const clockBadge = document.getElementById("hudClockBadge");
+      const clockBar = document.getElementById("hudClockBar");
+      if (clockVal) clockVal.innerText = `${curSec}s`;
+      if (clockSub) clockSub.innerText = `${formatClock(simMillis)} PM • ${simMillis}ms`;
+      if (clockBadge) {
+        clockBadge.innerText = isPaused ? "PAUSED" : `${simSpeed}x RUNNING`;
+        clockBadge.className = isPaused
+          ? "text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
+          : "text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold";
+      }
+
+      // 1.2 Bucketing Window Timer (bucketWindowMs: default 5s)
+      const bktBar = document.getElementById("hudBucketBar");
+      const bktVal = document.getElementById("hudBucketVal");
+      const bktSub = document.getElementById("hudBucketSub");
+      const bktBadge = document.getElementById("hudBucketBadge");
+      if (bktVal && bktBar) {
+        if (rfidBucket.eventActive) {
+          const elapsed = simMillis - rfidBucket.eventLastUniqueTagAt;
+          const remainMs = Math.max(0, sysConfig.bucketWindowMs - elapsed);
+          const remainSec = (remainMs / 1000).toFixed(1);
+          const pct = Math.max(0, Math.min(100, (remainMs / sysConfig.bucketWindowMs) * 100));
+          bktVal.innerText = `${remainSec}s`;
+          bktVal.className = "text-lg sm:text-xl font-mono font-black text-purple-400 animate-pulse";
+          bktSub.innerText = `${rfidBucket.tags.length} tag(s) collected`;
+          bktBadge.innerText = "COLLECTING";
+          bktBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold animate-pulse";
+          bktBar.style.width = `${pct}%`;
+          bktBar.className = "bg-purple-500 h-full rounded-full transition-all duration-75";
+        } else {
+          bktVal.innerText = "IDLE";
+          bktVal.className = "text-lg sm:text-xl font-mono font-black text-zinc-500";
+          bktSub.innerText = `${(sysConfig.bucketWindowMs / 1000).toFixed(1)}s window ready`;
+          bktBadge.innerText = "STANDBY";
+          bktBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-bold";
+          bktBar.style.width = "0%";
+        }
+      }
+
+      // 1.3 Cooldown Gate Timer (cooldown: default 10s)
+      const cdBar = document.getElementById("hudCooldownBar");
+      const cdVal = document.getElementById("hudCooldownVal");
+      const cdSub = document.getElementById("hudCooldownSub");
+      const cdBadge = document.getElementById("hudCooldownBadge");
+      if (cdVal && cdBar) {
+        const cdElapsed = lastAlarmTime > 0 ? (simMillis - lastAlarmTime) : Infinity;
+        const inCooldown = lastAlarmTime > 0 && cdElapsed <= sysConfig.cooldown;
+        if (inCooldown) {
+          const remainMs = Math.max(0, sysConfig.cooldown - cdElapsed);
+          const remainSec = (remainMs / 1000).toFixed(1);
+          const pct = Math.max(0, Math.min(100, (remainMs / sysConfig.cooldown) * 100));
+          cdVal.innerText = `${remainSec}s`;
+          cdVal.className = "text-lg sm:text-xl font-mono font-black text-amber-400 animate-pulse";
+          cdSub.innerText = "Pulses consumed";
+          cdBadge.innerText = "COOLING DOWN";
+          cdBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold animate-pulse";
+          cdBar.style.width = `${pct}%`;
+          cdBar.className = "bg-amber-500 h-full rounded-full transition-all duration-75";
+        } else {
+          cdVal.innerText = "READY";
+          cdVal.className = "text-lg sm:text-xl font-mono font-black text-emerald-400";
+          cdSub.innerText = `${(sysConfig.cooldown / 1000).toFixed(1)}s period armed`;
+          cdBadge.innerText = "ARMED";
+          cdBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold";
+          cdBar.style.width = "100%";
+          cdBar.className = "bg-emerald-500 h-full rounded-full transition-all duration-75";
+        }
+      }
+
+      // 1.4 Siren Audio Runtime (alarmDuration: default 10s)
+      const sirenBar = document.getElementById("hudSirenBar");
+      const sirenVal = document.getElementById("hudSirenVal");
+      const sirenSub = document.getElementById("hudSirenSub");
+      const sirenBadge = document.getElementById("hudSirenBadge");
+      if (sirenVal && sirenBar) {
+        if (alarmActive) {
+          const elapsed = simMillis - alarmStartTime;
+          const remainMs = Math.max(0, sysConfig.alarmDuration - elapsed);
+          const remainSec = (remainMs / 1000).toFixed(1);
+          const pct = Math.max(0, Math.min(100, (remainMs / sysConfig.alarmDuration) * 100));
+          sirenVal.innerText = `${remainSec}s`;
+          sirenVal.className = "text-lg sm:text-xl font-mono font-black text-red-500 animate-pulse";
+          sirenSub.innerText = `Track ${sysConfig.alarmVoice} + Strobe`;
+          sirenBadge.innerText = "BLARING";
+          sirenBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold animate-pulse";
+          sirenBar.style.width = `${pct}%`;
+          sirenBar.className = "bg-red-500 h-full rounded-full transition-all duration-75";
+        } else {
+          sirenVal.innerText = "SILENT";
+          sirenVal.className = "text-lg sm:text-xl font-mono font-black text-zinc-500";
+          sirenSub.innerText = `${(sysConfig.alarmDuration / 1000).toFixed(1)}s DFPlayer standby`;
+          sirenBadge.innerText = "OFF";
+          sirenBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-bold";
+          sirenBar.style.width = "0%";
+        }
+      }
+
+      // 1.5 Pre-Breach RFID Tag Memory (tagMemoryMs: default 5s)
+      const tagBar = document.getElementById("hudTagBar");
+      const tagVal = document.getElementById("hudTagVal");
+      const tagSub = document.getElementById("hudTagSub");
+      const tagBadge = document.getElementById("hudTagBadge");
+      if (tagVal && tagBar) {
+        if (!rfidBucket.eventActive && rfidBucket.tags.length > 0) {
+          const elapsed = simMillis - rfidBucket.lastPreBreachActivityAt;
+          const remainMs = Math.max(0, sysConfig.tagMemoryMs - elapsed);
+          const remainSec = (remainMs / 1000).toFixed(1);
+          const pct = Math.max(0, Math.min(100, (remainMs / sysConfig.tagMemoryMs) * 100));
+          tagVal.innerText = `${remainSec}s`;
+          tagVal.className = "text-lg sm:text-xl font-mono font-black text-cyan-400";
+          tagSub.innerText = `${rfidBucket.tags.length} tag(s) retained`;
+          tagBadge.innerText = "RETAINED";
+          tagBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-bold";
+          tagBar.style.width = `${pct}%`;
+          tagBar.className = "bg-cyan-500 h-full rounded-full transition-all duration-75";
+        } else {
+          tagVal.innerText = "EMPTY";
+          tagVal.className = "text-lg sm:text-xl font-mono font-black text-zinc-500";
+          tagSub.innerText = `${(sysConfig.tagMemoryMs / 1000).toFixed(1)}s pre-breach window`;
+          tagBadge.innerText = "IDLE";
+          tagBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-bold";
+          tagBar.style.width = "0%";
+        }
+      }
+
+      // 1.6 Breach Grace Window (breachMemoryMs: default 5s / 4.95s grace)
+      const graceBar = document.getElementById("hudGraceBar");
+      const graceVal = document.getElementById("hudGraceVal");
+      const graceSub = document.getElementById("hudGraceSub");
+      const graceBadge = document.getElementById("hudGraceBadge");
+      if (graceVal && graceBar) {
+        const gracePeriodMs = Math.max(0, sysConfig.breachMemoryMs - 50);
+        if (breachRemembered && !rfidBucket.eventActive) {
+          const elapsed = simMillis - lastBreachAt;
+          const remainMs = Math.max(0, gracePeriodMs - elapsed);
+          const remainSec = (remainMs / 1000).toFixed(2);
+          const pct = Math.max(0, Math.min(100, (remainMs / gracePeriodMs) * 100));
+          graceVal.innerText = `${remainSec}s`;
+          graceVal.className = "text-lg sm:text-xl font-mono font-black text-rose-400 animate-pulse";
+          graceSub.innerText = "Awaiting card scan...";
+          graceBadge.innerText = "GRACE PERIOD";
+          graceBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold animate-pulse";
+          graceBar.style.width = `${pct}%`;
+          graceBar.className = "bg-rose-500 h-full rounded-full transition-all duration-75";
+        } else {
+          graceVal.innerText = "CLEAR";
+          graceVal.className = "text-lg sm:text-xl font-mono font-black text-zinc-500";
+          graceSub.innerText = `${(gracePeriodMs / 1000).toFixed(2)}s card match wait`;
+          graceBadge.innerText = "CLEAR";
+          graceBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-bold";
+          graceBar.style.width = "0%";
+        }
+      }
+
+      // 1.7 IR Beam Episode / Obstruction (persistentBeamAlertMs: 15m)
+      const hudBeamBar = document.getElementById("hudBeamBar");
+      const hudBeamVal = document.getElementById("hudBeamVal");
+      const hudBeamSub = document.getElementById("hudBeamSub");
+      const hudBeamBadge = document.getElementById("hudBeamBadge");
+      if (hudBeamVal && hudBeamBar) {
+        if (beamEpisodeActive) {
+          const elapsedMs = simMillis - beamBrokenSince;
+          const elapsedSec = Math.floor(elapsedMs / 1000);
+          const mins = Math.floor(elapsedSec / 60);
+          const secs = elapsedSec % 60;
+          const timeFormatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          const pct = Math.min(100, (elapsedMs / sysConfig.persistentBeamAlertMs) * 100);
+          hudBeamVal.innerText = timeFormatted;
+          hudBeamVal.className = elapsedMs >= sysConfig.persistentBeamAlertMs
+            ? "text-lg sm:text-xl font-mono font-black text-red-500 animate-pulse"
+            : "text-lg sm:text-xl font-mono font-black text-amber-400";
+          hudBeamSub.innerText = beamNotificationQueued ? "Persistent SMS dispatched" : `Alert at ${sysConfig.persistentBeamAlertMs / 60000}m`;
+          hudBeamBadge.innerText = currentIRState ? "OBSTRUCTED" : "RECOVERING";
+          hudBeamBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-bold animate-pulse";
+          hudBeamBar.style.width = `${pct}%`;
+          hudBeamBar.className = elapsedMs >= sysConfig.persistentBeamAlertMs ? "bg-red-500 h-full rounded-full" : "bg-amber-500 h-full rounded-full";
+        } else {
+          hudBeamVal.innerText = "0.0s";
+          hudBeamVal.className = "text-lg sm:text-xl font-mono font-black text-emerald-400";
+          hudBeamSub.innerText = "Optical path aligned";
+          hudBeamBadge.innerText = "ALIGNED";
+          hudBeamBadge.className = "text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold";
+          hudBeamBar.style.width = "0%";
+          hudBeamBar.className = "bg-emerald-500 h-full rounded-full";
+        }
+      }
+
+      // -----------------------------------------------------------
+      // 2. WORKBENCH & PHYSICAL LABELS
+      // -----------------------------------------------------------
+      document.getElementById("txtSimMillis").innerText = `${simMillis} ms`;
+      document.getElementById("txtSimTimeSec").innerText = `${(simMillis / 1000).toFixed(1)}s`;
+      document.getElementById("phoneClock").innerText = `${formatClock(simMillis)} PM`;
+
+      // Beam status
+      const beamLine = document.getElementById("visualBeamLine");
+      const beamBadge = document.getElementById("badgeBeamStatus");
+      const beamText = document.getElementById("txtBeamStatus");
+      const rxDot = document.getElementById("rxSensorDot");
+
+      if (currentIRState) {
+        beamLine.classList.add("hidden");
+        rxDot.className = "w-3 h-3 rounded-full bg-red-600 shadow-[0_0_8px_rgba(239,68,68,0.9)]";
+        beamBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 bg-red-500/20 text-red-400 border border-red-500/40";
+        beamText.innerText = "BEAM BROKEN (PULLED HIGH)";
+      } else {
+        beamLine.classList.remove("hidden");
+        rxDot.className = "w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]";
+        beamBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        beamText.innerText = "BEAM ALIGNED & CLEAR";
+      }
+
+      // Mode & Lock status
+      const modeText = document.getElementById("txtSystemMode");
+      const modeLed = document.getElementById("lampStatusLed");
+      if (sysConfig.isLocked) {
+        modeText.innerText = "LOCKED (ADMIN ACCESS ONLY)";
+        modeText.className = "text-xs font-mono font-bold text-red-500 animate-pulse";
+        modeLed.className = "w-5 h-5 rounded-full bg-red-600 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse";
+      } else if (currentMode === MODE_CONFIG) {
+        modeText.innerText = "MODE_CONFIG (AP Portal)";
+        modeText.className = "text-xs font-mono font-bold text-amber-400";
+        modeLed.className = "w-5 h-5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse";
+      } else {
+        modeText.innerText = "MODE_NORMAL";
+        modeText.className = "text-xs font-mono font-bold text-emerald-400";
+        modeLed.className = "w-5 h-5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse";
+      }
+
+      // Sensor states
+      document.getElementById("valWaitingRecovery").innerText = waitingForBeamRecovery ? "true (BLOCKING)" : "false (Unlatched)";
+      document.getElementById("valWaitingRecovery").className = waitingForBeamRecovery ? "font-bold text-red-400 mt-0.5" : "font-bold text-emerald-400 mt-0.5";
+      document.getElementById("valBreachRemembered").innerText = breachRemembered ? "true (ARMED)" : "false";
+      document.getElementById("valBreachRemembered").className = breachRemembered ? "font-bold text-amber-400 mt-0.5" : "font-bold text-zinc-400 mt-0.5";
+
+      // Alarm LED GPIO 4 (active if alarmActive or beamEpisodeActive)
+      const strobe = document.getElementById("lampStrobeLed");
+      const strobeTxt = document.getElementById("txtStrobeLed");
+      if (alarmActive || beamEpisodeActive) {
+        strobe.className = "w-14 h-14 rounded-full bg-red-600 border-2 border-red-400 flex items-center justify-center transition-all strobe-active";
+        strobeTxt.className = "text-xs font-mono font-bold text-red-400";
+        strobeTxt.innerText = "HIGH (FLASHING)";
+      } else {
+        strobe.className = "w-14 h-14 rounded-full bg-red-950 border-2 border-red-800 flex items-center justify-center transition-all";
+        strobeTxt.className = "text-xs font-mono font-bold text-zinc-500";
+        strobeTxt.innerText = "LOW (OFF)";
+      }
+
+      // Audio state
+      const audioBadge = document.getElementById("badgeAudioState");
+      if (alarmActive) {
+        const sirenRemain = ((sysConfig.alarmDuration - (simMillis - alarmStartTime)) / 1000).toFixed(1);
+        audioBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-red-500/20 text-red-400 font-bold animate-pulse";
+        audioBadge.innerText = `SIREN PLAYING (${sirenRemain}s)`;
+      } else {
+        audioBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400";
+        audioBadge.innerText = "IDLE";
+      }
+
+      // RFIDBucket status
+      if (rfidBucket.eventActive) {
+        const remain = ((sysConfig.bucketWindowMs - (simMillis - rfidBucket.eventLastUniqueTagAt)) / 1000).toFixed(1);
+        document.getElementById("txtRfidBucketInfo").innerText = `${rfidBucket.tags.length} tag(s) [BUCKETING: ${remain}s left]`;
+      } else if (rfidBucket.tags.length > 0) {
+        const remainPre = ((sysConfig.tagMemoryMs - (simMillis - rfidBucket.lastPreBreachActivityAt)) / 1000).toFixed(1);
+        document.getElementById("txtRfidBucketInfo").innerText = `${rfidBucket.tags.length} tag(s) buffered (Pre-Breach, ${remainPre}s remain)`;
+      } else {
+        document.getElementById("txtRfidBucketInfo").innerText = "Empty (Idle)";
+      }
+
+      // Queues
+      document.getElementById("txtIncidentQueueLen").innerText = incidentQueue.length;
+      document.getElementById("txtAlarmQueueLen").innerText = alarmQueue.length;
+      document.getElementById("txtModemState").innerText = modemState;
+      document.getElementById("txtInFlightSms").innerText = `${alarmQueue.length + (smsInFlight ? 1 : 0)} in queue`;
+
+      // Live Gantt Sync
+      updateTimelineGantt();
+    }
+
+    function updateTimelineGantt() {
+      const maxGanttSec = 40.0;
+      const curSec = (simMillis / 1000) % maxGanttSec;
+      const pct = (curSec / maxGanttSec) * 100;
+
+      document.getElementById("ganttNeedle").style.left = pct + "%";
+      document.getElementById("ganttNeedleText").innerText = curSec.toFixed(1) + "s";
+
+      const bucketSec = sysConfig.bucketWindowMs / 1000;
+      const cooldownSec = sysConfig.cooldown / 1000;
+      const sirenSec = sysConfig.alarmDuration / 1000;
+
+      const bucketPct = (bucketSec / maxGanttSec) * 100;
+      const cooldownPct = (cooldownSec / maxGanttSec) * 100;
+      const sirenPct = (sirenSec / maxGanttSec) * 100;
+
+      const barB = document.getElementById("barGanttBucket");
+      barB.style.width = Math.min(100, bucketPct) + "%";
+      barB.innerText = `${bucketSec}s Window`;
+      document.getElementById("lblGanttBucket").innerText = `0s - ${bucketSec}s`;
+
+      const barC = document.getElementById("barGanttCooldown");
+      barC.style.marginLeft = Math.min(100, bucketPct) + "%";
+      barC.style.width = Math.min(100 - bucketPct, cooldownPct) + "%";
+      barC.innerText = `${cooldownSec}s Cooldown`;
+      document.getElementById("lblGanttCooldown").innerText = `${bucketSec}s - ${bucketSec + cooldownSec}s`;
+
+      const barS = document.getElementById("barGanttSiren");
+      barS.style.width = Math.min(100, sirenPct) + "%";
+      barS.innerText = `${sirenSec}s Siren`;
+      document.getElementById("lblGanttSiren").innerText = `0s - ${sirenSec}s`;
+
+      const totalCycle = bucketSec + cooldownSec;
+      document.getElementById("liveTimelineNotice").innerText =
+        `Total Cycle: ${totalCycle}s (${bucketSec}s bucketing + ${cooldownSec}s cooldown)`;
+    }
+
+    // -------------------------------------------------------------
+    // Web Portal Handlers (Mirroring web_portal.h handlePostConfig)
+    // -------------------------------------------------------------
+    function savePortalSettings() {
+      const cd = Number(document.getElementById("portalCooldown").value);
+      const dur = Number(document.getElementById("portalAlarmDuration").value);
+      const bkt = Number(document.getElementById("portalBucketWindow").value);
+      const brc = Number(document.getElementById("portalBreachMemory").value);
+      const tag = Number(document.getElementById("portalTagMemory").value);
+      const voc = Number(document.getElementById("portalVoiceTrack").value);
+      const phone = document.getElementById("portalGuardPhone").value.trim();
+      const wall = document.getElementById("portalWallLabel").value.trim();
+      const role = document.getElementById("portalRecipientRole").value;
+      const locked = document.getElementById("portalIsLocked").checked;
+
+      sysConfig.cooldown = cd * 1000;
+      sysConfig.alarmDuration = dur * 1000;
+      sysConfig.bucketWindowMs = bkt * 1000;
+      sysConfig.breachMemoryMs = brc * 1000;
+      sysConfig.tagMemoryMs = tag * 1000;
+      sysConfig.alarmVoice = voc;
+      if (phone) sysConfig.guardPhone = phone;
+      if (wall) sysConfig.wallLabel = wall;
+      sysConfig.recipientRole = role;
+      sysConfig.isLocked = locked;
+
+      document.getElementById("valTagMemorySec").innerText = `${tag}s`;
+      document.getElementById("valBucketWindowSec").innerText = `${bkt}s`;
+      document.getElementById("valBreachGrace").innerText = `${(brc - 0.05).toFixed(2)}s (Memory - 50ms)`;
+      document.getElementById("txtCurrentTrack").innerText = `Track ${voc}: "${VOICE_TRACKS[voc]}"`;
+
+      playBeep(1200, 0.1);
+      logConsole("CONFIG", `Web Portal updated: cooldown=${cd}s, alarmDuration=${dur}s, bucketWindow=${bkt}s, breachMemory=${brc}s, role=${role}, locked=${locked}.`, "text-blue-400 font-bold");
+      switchTab("bench");
+    }
+
+    function portalFactoryReset() {
+      if (confirm("Restore ESP32 factory defaults? This clears EEPROM and resets all settings.")) {
+        logConsole("CONFIG", "[SYSTEM] Factory reset requested via Web Portal. Resetting to factory defaults...", "text-amber-400 font-bold");
+        resetFullSystem();
+        switchTab("bench");
+      }
+    }
+
+    function runStudentCooldownScenario() {
+      // 1. Reset to clean state
+      resetFullSystem();
+      switchTab("bench");
+
+      // 2. Set the student settings
+      sysConfig.cooldown = 10000;       // 10s
+      sysConfig.bucketWindowMs = 5000;  // 5s
+      sysConfig.alarmDuration = 10000;  // 10s
+      sysConfig.breachMemoryMs = 5000;  // 5s
+      sysConfig.tagMemoryMs = 5000;     // 5s
+      sysConfig.alarmVoice = 1;
+
+      document.getElementById("portalCooldown").value = "10";
+      document.getElementById("portalBucketWindow").value = "5";
+      document.getElementById("portalAlarmDuration").value = "10";
+      document.getElementById("portalTagMemory").value = "5";
+      document.getElementById("portalBreachMemory").value = "5";
+      document.getElementById("valTagMemorySec").innerText = "5s";
+      document.getElementById("valBucketWindowSec").innerText = "5s";
+
+      logConsole("TEST", "==================================================", "text-amber-400 font-bold");
+      logConsole("TEST", "🔬 RUNNING STUDENT 10s COOLDOWN DEMONSTRATION", "text-amber-300 font-bold text-sm");
+      logConsole("TEST", "Config: cooldown=10s | bucketWindowMs=5s | alarmDuration=10s | tagMemoryMs=5s", "text-blue-400 font-semibold");
+      logConsole("TEST", "Timeline Breakdown: Bucketing (5s) -> Cooldown (10s) = Total 15s Re-Arm Cycle", "text-zinc-300");
+      logConsole("TEST", "==================================================", "text-amber-400 font-bold");
+
+      // Step 1: Student scans card
+      setTimeout(() => {
+        tapCard('9A3B5C10', 'Juan Dela Cruz', '2024-0101');
+        logConsole("TEST", "STEP 1 [t=0.5s]: Juan scans card. Buffered in pre-breach memory (retained for 5s).", "text-cyan-400 font-bold");
+      }, 500);
+
+      // Step 2: Student jumps wall
+      setTimeout(() => {
+        triggerJumpWallPulse();
+        logConsole("TEST", "STEP 2 [t=1.5s]: Student jumps wall (IR beam broken)! Siren blares immediately (10s duration).", "text-red-400 font-bold");
+        logConsole("TEST", "CRITICAL NOTICE: Bucketing Window opens for 5s (t=1.5s -> 6.5s). lastAlarmTime is NOT STAMPED YET!", "text-purple-400 font-bold");
+      }, 1500);
+
+      // Step 3: Second student jumps while bucketing is active
+      setTimeout(() => {
+        triggerJumpWallPulse();
+        logConsole("TEST", "STEP 3 [t=4.0s]: Accomplice attempts jump during bucketing window. Beam break ignored because waitingForBeamRecovery=true.", "text-amber-400 font-semibold");
+      }, 4000);
+
+      // Step 4: Bucketing window finishes, cooldown starts!
+      setTimeout(() => {
+        logConsole("TEST", "STEP 4 [t=6.5s]: Bucketing window FINISHES! lastAlarmTime is finally stamped at t=6.5s!", "text-purple-400 font-bold");
+        logConsole("TEST", "STEP 5: 10s Cooldown officially STARTS NOW (t=6.5s -> 16.5s)! Total delay from initial breach = 15s!", "text-amber-400 font-bold");
+      }, 6800);
+
+      // Step 5: Jumper tests at t=10s (inside cooldown)
+      setTimeout(() => {
+        triggerJumpWallPulse();
+        logConsole("TEST", "STEP 6 [t=10.0s]: Student tries jumping at t=10s thinking system is ready! Breach rejected & consumed!", "text-red-400 font-semibold");
+      }, 10200);
+
+      // Step 6: Siren ends at t=11.5s (10s duration)
+      setTimeout(() => {
+        logConsole("TEST", "STEP 7 [t=11.5s]: Siren audio completes (10s duration). Loudspeaker is now SILENT, but Cooldown is STILL active until t=16.5s!", "text-blue-400 font-bold");
+      }, 11800);
+
+      // Step 7: Cooldown ends at t=16.5s
+      setTimeout(() => {
+        logConsole("TEST", "STEP 8 [t=16.5s]: 10s Cooldown has ended. System is completely re-armed and ready for next event!", "text-emerald-400 font-bold");
+        logConsole("TEST", "SUMMARY FOR STUDENTS: Setting cooldown to 10s with 5s bucketing yields exactly 15s re-arm cycle and 10s of siren sound. 1:1 parity with ESP32!", "text-emerald-300 font-bold");
+      }, 16800);
+    }
+
+    function changeVolume() {
+      const v = document.getElementById("sliderVolume").value;
+      document.getElementById("txtVolumeVal").innerText = v;
+    }
+
+    function toggleSimPause() {
+      isPaused = !isPaused;
+      document.getElementById("simPauseIcon").innerText = isPaused ? "▶" : "⏸";
+      document.getElementById("simPauseText").innerText = isPaused ? "Resume" : "Pause";
+    }
+
+    function setSimSpeed(spd) {
+      simSpeed = spd;
+      document.querySelectorAll(".speed-btn").forEach(b => {
+        if (Number(b.dataset.spd) === spd) {
+          b.classList.add("bg-blue-500/20", "text-blue-400");
+        } else {
+          b.classList.remove("bg-blue-500/20", "text-blue-400");
+        }
+      });
+    }
+
+    function toggleFullscreen() {
+      const btn = document.getElementById("btnFullscreen");
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.warn("Fullscreen request error:", err);
+          });
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(err => {
+            console.warn("Exit fullscreen error:", err);
+          });
+        }
+      }
+    }
+
+    document.addEventListener("fullscreenchange", () => {
+      const btn = document.getElementById("btnFullscreen");
+      if (!btn) return;
+      if (document.fullscreenElement) {
+        btn.innerHTML = "<span>🗗</span> Exit Fullscreen";
+        btn.classList.add("bg-blue-500/20", "text-blue-200");
+      } else {
+        btn.innerHTML = "<span>⛶</span> Fullscreen";
+        btn.classList.remove("bg-blue-500/20", "text-blue-200");
+      }
+    });
+
+    function resetFullSystem() {
+      simMillis = 0;
+      currentIRState = false;
+      isHoldObstruction = false;
+      waitingForBeamRecovery = false;
+      breachRemembered = false;
+      lastBreachAt = 0;
+      lastAlarmTime = 0;
+      alarmActive = false;
+      alarmStartTime = 0;
+      beamEpisodeActive = false;
+      beamBrokenSince = 0;
+      beamRecoveryTiming = false;
+      rfidBucket.eventActive = false;
+      rfidBucket.tags = [];
+      incidentQueue = [];
+      alarmQueue = [];
+      smsInFlight = null;
+      modemState = "IDLE";
+      stopSirenSound();
+      clearConsole();
+      for (const s of Object.values(studentDB)) {
+        s.triggerCount = 0;
+      }
+      unregTriggers = 0;
+      updateStudentCounters();
+      logConsole("BOOT", "Master system reset complete. Normal Mode Active.", "text-zinc-400");
+      updateHardwareUI();
+    }
+
+    // Main 50ms FreeRTOS ticker
+    setInterval(() => {
+      if (!isPaused) {
+        const dt = 50 * simSpeed;
+        simMillis += dt;
+        sensorTaskTick(dt);
+        commTaskTick(dt);
+        updateHardwareUI();
+      }
+    }, 50);
+
+    // Initial load
+    renderStudentCards();
+    renderSdStudentsTable();
+    updateStudentCounters();
+    updateHardwareUI();
+  </script>
+</body>
+</html>
